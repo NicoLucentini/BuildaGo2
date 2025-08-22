@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a906fc2dc7bd2e4d977703358211796, type: 3}
+  m_Name: PaintImproved
+  m_EditorClassIdentifier: 
+  energyCost: 1
+  cardName: Labor Improved
+  cardDescription: 
+  retain: 0
+  isNegative: 0
+  removeOnPlay: 0
+  applyEffectsOn: 0
+  effects:
+  - rid: 7497728458646093896
+  - rid: 7497728641265041494
+  references:
+    version: 2
+    RefIds:
+    - rid: 7497728458646093896
+      type: {class: LaborEffect, ns: , asm: Assembly-CSharp}
+      data:
+        description: Does @amount @type labor
+        amount: 1
+        type: 1
+    - rid: 7497728641265041494
+      type: {class: ImproveLaborType, ns: , asm: Assembly-CSharp}
+      data:
+        description: '@improve @amount on @type, affects @affects with @duration
+          duration'
+        type: 1
+        amount: 1
+        improveType: 1
+        weeksAmount: 0
+        cardAffects: 1
+        permanent: 1

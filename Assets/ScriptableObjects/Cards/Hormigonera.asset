@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a906fc2dc7bd2e4d977703358211796, type: 3}
+  m_Name: Hormigonera
+  m_EditorClassIdentifier: 
+  energyCost: 2
+  cardName: Hormigonera
+  cardDescription: Incrementa en 1 todos los efectos de construccion
+  retain: 0
+  effects:
+  - rid: 7497728458646093919
+  - rid: 7497728458646094124
+  - rid: 7497728458646094125
+  references:
+    version: 2
+    RefIds:
+    - rid: 7497728458646093919
+      type: {class: ImproveLaborType, ns: , asm: Assembly-CSharp}
+      data:
+        description: 
+        type: 0
+        amount: 1
+        improveType: 1
+        weeksAmount: 1
+        cardAffects: 0
+    - rid: 7497728458646094124
+      type: {class: DiscardCard, ns: , asm: Assembly-CSharp}
+      data:
+        description: Discard 1 card
+    - rid: 7497728458646094125
+      type: {class: DrawCard, ns: , asm: Assembly-CSharp}
+      data:
+        description: Draw 2 cards
+        amount: 2

@@ -8,6 +8,7 @@ public class LookAtCamera : MonoBehaviour
     }
     private void LateUpdate()
     {
-        transform.LookAt(Camera.main.transform.position.WithY(transform.position.y));
+        //transform.LookAt(Camera.main.transform.position.WithY(transform.position.y));
+        transform.forward = -Camera.main.transform.forward;
     }
 }

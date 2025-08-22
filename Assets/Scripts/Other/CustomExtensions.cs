@@ -34,18 +34,7 @@ public static class Vector3Extension {
 }
 public static class IntExtension
 {
-    public static int Change(this int value, int amount, ImprovationType type)
-    {
-        if (type == ImprovationType.SUM)
-        {
-            return value + amount;
-        }
-        else if (type == ImprovationType.MULTIPLIER)
-        {
-            return value * amount;
-        }
-        return value;
-    }
+   
 }
 public static class MathHelper
 {
@@ -69,6 +58,20 @@ public static class MonobehaviourExtension
         var comps = component.GetComponentsInChildren<T>().ToList();
         comps.RemoveAll(x => x.gameObject == component.gameObject);
         return comps;
+    }
+}
+public static class ListExtension {
+
+    public static void Shuffle<T>(this IList<T> list)
+    {
+        var rng = new System.Random();
+        int n = list.Count;
+        while (n > 1)
+        {
+            n--;
+            int k = rng.Next(n + 1); // random index between 0 and n
+            (list[n], list[k]) = (list[k], list[n]); // swap
+        }
     }
 }
 public static class ColorExtension
@@ -188,11 +191,5 @@ public static class CustomRandom
         return chances[chances.Count - 1];
     }
 
-}
-
-public enum ImprovationType
-{
-    SUM,
-    MULTIPLIER
 }
 

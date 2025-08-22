@@ -1,9 +1,5 @@
 using System.Collections;
-using System.Runtime.InteropServices.WindowsRuntime;
-using System.Security.Cryptography;
-using Unity.VisualScripting;
 using UnityEngine;
-using static UnityEngine.GraphicsBuffer;
 
 public class RenderBoundsHeight : MonoBehaviour
 {
@@ -13,8 +9,7 @@ public class RenderBoundsHeight : MonoBehaviour
     public MaterialPropertyBlock mpb;
     public Renderer rend;
 
-    //I dont think this is needed
-    private float currentCompletition = 1;
+    public float currentCompletition = 1;
 
     public float objectHeight = 0;
 
@@ -31,10 +26,17 @@ public class RenderBoundsHeight : MonoBehaviour
         if(!isSet)
         { 
             rend = GetComponent<Renderer>();
-            Init();
+           
             isSet = true;
+           
         }
+        Init();
         UpdateCurrentCompletition(currentCompletition);
+    }
+    private void Start()
+    {
+        Init();
+        UpdateCurrentCompletition(1);
     }
     public void Init()
     {

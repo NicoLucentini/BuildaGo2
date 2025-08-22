@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f459f5d9f9061c44fa50ab449fa620f1, type: 3}
+  m_Name: HousesTable
+  m_EditorClassIdentifier: 
+  houses:
+  - prefab: {fileID: 4225889595729440855, guid: d9c9496985f8eac48a99ce7796c53e4a, type: 3}
+    workforceNeeeded: 5
+    reward: 10
+  - prefab: {fileID: 8748710420169994173, guid: 117e91b50b94c2641952f05d992d124d, type: 3}
+    workforceNeeeded: 8
+    reward: 14
+  - prefab: {fileID: 2450393910610617121, guid: 79578a62f4ea72f46a227ee72d2b318d, type: 3}
+    workforceNeeeded: 13
+    reward: 19
+  - prefab: {fileID: 4420684402799012146, guid: e9cd2223936467744b75d06d7edf5e07, type: 3}
+    workforceNeeeded: 21
+    reward: 30
+  - prefab: {fileID: 5324619651563278411, guid: a31582c88ea5c0542b905a0163c07803, type: 3}
+    workforceNeeeded: 34
+    reward: 42
+  - prefab: {fileID: 3099803498969112351, guid: 902efefa36b09544593dd47c23456be1, type: 3}
+    workforceNeeeded: 55
+    reward: 67
+  - prefab: {fileID: 8462176957703091397, guid: 18742878aa9bff849872a4c6aa96cd4f, type: 3}
+    workforceNeeeded: 89
+    reward: 112
+  - prefab: {fileID: 730625951688752632, guid: b452623d41775884c9bf8ae2dd462c42, type: 3}
+    workforceNeeeded: 144
+    reward: 160

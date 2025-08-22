@@ -114,6 +114,7 @@ public class CameraMovement : MonoBehaviour
         }
 
         targetPosition = transform.position;
+        lockCamera = false;
         yield return null;
     }
   
