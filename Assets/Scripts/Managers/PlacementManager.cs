@@ -90,7 +90,7 @@ public class PlacementManager : MonoBehaviour
         gridCenter = new Vector3(gridSize.x / 2f, 0, gridSize.y / 2f);
 
         //gridModel.transform.position += new Vector3(gridOffset.x, 0, gridOffset.y) ;
-        gridModel.transform.position += new Vector3(gridCenter.x, 0, gridCenter.z);
+        gridModel.transform.position = new Vector3(gridCenter.x, 0, gridCenter.z);
 
         OnGridReplaced?.Invoke(gridModel.transform);
         gridModel.GetComponent<MeshRenderer>().material.mainTextureScale = gridSize / 2;
@@ -167,7 +167,13 @@ public class PlacementManager : MonoBehaviour
         current = item;
         prefabVisual = Instantiate(item.prefab);
     }
-    
+    void DestroyPrefabVisual()
+    {
+        if (prefabVisual != null && prefabVisual.gameObject != null)
+            Destroy(prefabVisual.gameObject);
+    }
+
+
     private void Update()
     {
         if (prefabVisual == null)
@@ -198,35 +204,14 @@ public class PlacementManager : MonoBehaviour
         }
     }
 
-    Vector3 ToGridPosition(Vector3 hit) {
+    public Vector3 ToGridPosition(Vector3 hit) {
         var x = Mathf.FloorToInt(hit.x);
         var y = Mathf.FloorToInt(hit.z);
         return new Vector3(x+ cellSize / 2 , 0.5f, y + cellSize / 2 );
     }
-    void DestroyPrefabVisual()
-    {
-        if (prefabVisual != null && prefabVisual.gameObject != null)
-            Destroy(prefabVisual.gameObject);
-    }
-    
-    void OnGroundClick(Vector3 point)
-    {
-        if (prefabVisual == null || current == null) return;
-        if (current.onCooldown) return;
-        if (!GameManager.instance.HasGold(current.goldCost)) return;
-
-        bool onGrid = IsObjectOnGrid(point, prefabVisual.size);
-        if (!IsPlaceFree(point, prefabVisual.size)) { Debug.Log("Place is Occupied"); return; }
-        if (!onGrid && !IsObjectOnGrid(prefabVisual.transform.position, prefabVisual.size)) { Debug.Log("Object Outside grid"); return; };
-        if (!AreNeighboursOfDifferentType(point)) return;
-        
-        GameManager.instance.UseGold(current.goldCost);
-        PlaceBuildingFromLowBar(onGrid ? point : prefabVisual.transform.position, current.type);
-        current.OnCooldown(true);
-        new Timer("BuildingCooldown" + gameObject.GetInstanceID(), current.cooldown, () => current.OnCooldown(false)).Start();
-    }
     //Despues lo veo
-    Vector3 GetCorrectedPointForBuilding(Vector3 gridPoint, Vector2Int size) {
+    public Vector3 GetCorrectedPointForBuilding(Vector3 gridPoint, Vector2Int size)
+    {
         float moveX = size.x % 2 == 0 ? -0.5f : 0f;
         float moveY = size.y % 2 == 0 ? -0.5f : 0f;
 
@@ -238,16 +223,38 @@ public class PlacementManager : MonoBehaviour
         {
             moveX = size.x / 2f - 0.5f;
         }
-        if (gridPoint.z + size.y/2f > gridSize.y )
+        if (gridPoint.z + size.y / 2f > gridSize.y)
         {
-            moveY = gridSize.y  - (gridPoint.z + size.y/2f );
+            moveY = gridSize.y - (gridPoint.z + size.y / 2f);
         }
         else if (gridPoint.z - size.y / 2f < 0)
         {
-            moveY =  size.y / 2f - 0.5f; 
+            moveY = size.y / 2f - 0.5f;
         }
         return gridPoint + new Vector3(moveX, 0, moveY);
     }
+    
+    public bool OnGroundClick(Vector3 point)
+    {
+        if (prefabVisual == null || current == null) return false;
+        if (current.onCooldown) return false;
+        if (!GameManager.instance.HasGold(current.goldCost)) return false;
+        if (!IsPlaceFreeAndObjectIsOnGrid(point, prefabVisual.size)) return false;
+        if (!AreNeighboursOfDifferentType(point)) return false;
+
+
+        PlaceBuildingFromLowBar(point, current.type);
+        GameManager.instance.UseGold(current.goldCost);
+        current.OnCooldown(true);
+        new Timer("BuildingCooldown" + gameObject.GetInstanceID(), current.cooldown, () => current.OnCooldown(false)).Start();
+        return true;
+    }
+    public bool IsPlaceFreeAndObjectIsOnGrid(Vector3 gridPointCorrected, Vector2Int size) {
+        if (!IsPlaceFree(gridPointCorrected, size)) { Debug.Log("Place is Occupied"); return false; }
+        if (!IsObjectOnGrid(gridPointCorrected,size)) { Debug.Log("Object Outside grid"); return false; };
+        return true;
+    }
+    
     bool IsPlaceFree(Vector3 hit, Vector2Int size)
     {
         drawHit = hit;
@@ -284,11 +291,10 @@ public class PlacementManager : MonoBehaviour
         var pos = GetPosWithSize(hit, buildingSize);
         bool isOnGrid = true;
         for (int i = 0; i < pos.Count; i++) {
-            Debug.Log("Pos : " + pos[i]);
             isOnGrid = IsOnGrid(pos[i]);
             if (!isOnGrid)
             {
-                Debug.Log("IsObject OnGrid false");
+                Debug.Log("Object outside grid");
                 return false;
             }
         }

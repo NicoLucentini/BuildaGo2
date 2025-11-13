@@ -105,7 +105,7 @@ public class UITalentItem : MonoBehaviour , IPointerClickHandler , IPointerEnter
     public void OnPointerEnter(PointerEventData eventData)
     {
         if (item.status == TalentStatus.USED || item.status == TalentStatus.HIDE) return; 
-        TooltipSystem.instance.Show(item.description, GetComponent<RectTransform>().position + new Vector3(150,150,0));
+        TooltipSystem.instance.Show(item.DoDescription(), GetComponent<RectTransform>().position + new Vector3(150,150,0));
     }
     public void OnPointerExit(PointerEventData eventData)
     {
@@ -130,6 +130,17 @@ public class TalentItem // Podria ser scriptable object
     //[NonSerialized] public List<TalentItem> from = new(); // 
     [NonSerialized] public List<TalentItem> to = new();
 
+    public string DoDescription() {
+        if (!string.IsNullOrEmpty(description)) return description;
+
+        string upgradeDescription = "";
+        upgrades.ForEach(x => upgradeDescription += x.GetDescription() + " \n");
+
+        string costDescription = "Cost: \n";
+        cost.ToList().ForEach(x => costDescription += $"{x.Key}:{x.Value}");
+
+        return upgradeDescription + costDescription;
+    }
 
     public void Show() {
         ChangeStatus(TalentStatus.LOCKED);

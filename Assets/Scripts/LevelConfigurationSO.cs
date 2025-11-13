@@ -15,4 +15,5 @@ public class LevelConfigurationSO : ScriptableObject
     public int startingGold;
 
     public Building bossPrefab;
+
 }

@@ -4,6 +4,9 @@
 public abstract class BaseUpgrade {
     public UpgradeType upgradeType;
     public UpgradeTarget target;
+    public virtual string GetDescription() {
+        return "";
+    }
     public virtual void Upgrade() {
         TalentManager.instance.ShowPopup("Talent Applied");
     }
@@ -31,6 +34,10 @@ public class UpgradeStartingGold : BaseUpgrade
         GameManager.instance.AddStartingGold(amt);    
         base.Upgrade();
     }
+    public override string GetDescription()
+    {
+        return $"Upgrade starting Gold by {amount} {upgradeType.ToStringOverride()} \n";
+    }
 }
 public class DecreaseConstructionTime : BaseUpgrade
 {
@@ -47,6 +54,10 @@ public class DecreaseConstructionTime : BaseUpgrade
 
         PlacementManager.instance.DecreaseConstructionTime(type, value - amt);
         base.Upgrade();
+    }
+    public override string GetDescription()
+    {
+        return $"Decrease construction time of {type} by {amount} {upgradeType.ToStringOverride()} \n";
     }
 }
 public class DecreaseConstructionCost : BaseUpgrade
@@ -66,6 +77,10 @@ public class DecreaseConstructionCost : BaseUpgrade
         PlacementManager.instance.DecreaseConstructionCost(type, Mathf.RoundToInt(value - amt));
         base.Upgrade();
     }
+    public override string GetDescription()
+    {
+        return $"Decrease construction cost of {type} by {amount} {upgradeType.ToStringOverride()} \n";
+    }
 }
 public class IncreaseStartingTimer : BaseUpgrade
 {
@@ -79,6 +94,10 @@ public class IncreaseStartingTimer : BaseUpgrade
         }
         GameManager.instance.AddStartingTimer(Mathf.RoundToInt(amt));
         base.Upgrade();
+    }
+    public override string GetDescription()
+    {
+        return $"Increase starting timer by {amount} {upgradeType.ToStringOverride()} \n";
     }
 }
 public class IncreaseRoundTimer : BaseUpgrade
@@ -94,6 +113,10 @@ public class IncreaseRoundTimer : BaseUpgrade
     {
         GameManager.instance.AddTimer(amount);
     }
+    public override string GetDescription()
+    {
+        return $"Increase round timer by {amount} {upgradeType.ToStringOverride() } when building {type} is finished \n";
+    }
 }
 public class AddConstructionNear : BaseUpgrade {
     public BuildingType other;
@@ -108,14 +131,17 @@ public class AddConstructionNear : BaseUpgrade {
     {
         Vector3[] direction = new Vector3[8] { new Vector3(1,0,1), Vector3.right, Vector3.left, Vector3.forward, Vector3.back, new Vector3(-1,0,-1), new Vector3(-1, 0, 1), new Vector3(1, 0, -1) };
         direction.Shuffle();
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < direction.Length; i++) {
+
+            var size = PlacementManager.instance.placementPrefabs[other].item.prefab.size;
+            var sizedDirection = new Vector3(direction[i].x * size.x, 0, direction[i].z * size.y);
             var pos = building.transform.position + direction[i];
-            /*
-            if (PlacementManager.instance.IsPlaceFreeNonGrid(pos,PlacementManager.instance.placementPrefabs[type].item.prefab.size)){
-                PlacementManager.instance.PlaceBuildingFromLowBar(pos, other);
+            var gridPointCorrected = PlacementManager.instance.GetCorrectedPointForBuilding(PlacementManager.instance.ToGridPosition(pos), size);
+            if (PlacementManager.instance.IsPlaceFreeAndObjectIsOnGrid(gridPointCorrected, size)){
+                PlacementManager.instance.PlaceBuildingFromLowBar(gridPointCorrected, other);
                 break;
             }
-            */
+            
         }
         base.Apply();
     }
@@ -127,6 +153,10 @@ public class UpgradeBaseRewardTime : BaseUpgrade {
         GameManager.instance.AddBaseRewardTime(amount);
         base.Upgrade();
     }
+    public override string GetDescription()
+    {
+        return $"Upgrade Base reward time by {amount} {upgradeType.ToStringOverride()} when 1 house, 1 farm and 1 industries are put together \n";
+    }
 }
 public class UpgradeBaseRewardGold : BaseUpgrade
 {
@@ -135,6 +165,10 @@ public class UpgradeBaseRewardGold : BaseUpgrade
     {
         GameManager.instance.AddBaseRewardGold(amount);
         base.Upgrade();
+    }
+    public override string GetDescription()
+    {
+        return $"Upgrade Base reward gold by {amount} {upgradeType.ToStringOverride()} when 1 house, 1 farm and 1 industries are put together \n";
     }
 }
 public class AddPlacementPrefab : BaseUpgrade {
@@ -146,15 +180,33 @@ public class AddPlacementPrefab : BaseUpgrade {
         PlacementManager.instance.AddPlacementPrefab(type, prefab);
         base.Upgrade();
     }
+    public override string GetDescription()
+    {
+        return $"Creates a new building to place of type {type} \n";
+    }
 }
 public enum UpgradeType
 {
     ADD,
-    PERC
+    PERC,
+    OTHER
 }
+
 public enum UpgradeTarget
 {
     BUILDING_FINISHED,
     BUILDING_PLACED,
     ON_TALENT_UPGRADE
+}
+public static class UpgradeTypeExtension {
+    public static string ToStringOverride(this UpgradeType type) {
+        if (type == UpgradeType.ADD) {
+            return "";
+        }
+        else if(type == UpgradeType.PERC)
+        {
+            return "percent";
+        }
+        return "";
+    }
 }

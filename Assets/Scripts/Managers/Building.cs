@@ -58,7 +58,7 @@ public class Building : MonoBehaviour {
         TimersCoroutinesManager.instance.Stop("StartConstruction" + gameObject.GetInstanceID());
     }
     void CheckForConstruction(Building building) {
-        if (building == this) return;
+        if (building == this || building.type == BuildingType.Boss) return;
 
         if (building.type == BuildingType.Road)
             StartConstruction();
@@ -208,8 +208,9 @@ public class Building : MonoBehaviour {
     }
     
     bool HasRoadsAlong() {
-        var colls =  Physics.OverlapBox(transform.position, Vector3.one, Quaternion.identity, 1 << 10);
-        return colls.Length > 0 && colls.ToList().Any(x => x.gameObject.GetComponent<Building>().type == BuildingType.Road);
+        return neighbours.Any(x => x.type == BuildingType.Road);
+        //var colls =  Physics.OverlapBox(transform.position, Vector3.one, Quaternion.identity, 1 << 10);
+        //return colls.Length > 0 && colls.ToList().Any(x => x.gameObject.GetComponent<Building>().type == BuildingType.Road);
     }
     public void Place(float constructionTime = 0, List<BaseUpgrade> upgrades = null, bool startConstruction = true)
     {
@@ -224,9 +225,9 @@ public class Building : MonoBehaviour {
 
         neighbours.AddRange(FindExistingNeighbours());
 
+        SubscribeToEvents();
         if (startConstruction)
         {
-            SubscribeToEvents();
             StartConstruction();
         }
 

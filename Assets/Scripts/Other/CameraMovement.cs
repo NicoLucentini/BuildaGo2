@@ -46,6 +46,7 @@ public class CameraMovement : MonoBehaviour
     [Header("Wasd orto")]
     public float speed = 3f;
     private float forwardVariation = 1;
+    private Quaternion startingRotation;
     enum CameraMovementType{PAN_RTS, PAN_DRAG, WASD_ORTO }
 
     
@@ -64,8 +65,8 @@ public class CameraMovement : MonoBehaviour
 
         if (cameraMovementType == CameraMovementType.WASD_ORTO) {
             forwardVariation = transform.rotation.eulerAngles.y / transform.rotation.eulerAngles.x;
-
             Debug.Log("forwardVariation " + forwardVariation);
+            startingRotation = transform.rotation;
         }
     }
     public void Restart() {
