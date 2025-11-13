@@ -31,7 +31,6 @@ public class PlacementManager : MonoBehaviour
     public List<Vector3> posOccupied = new List<Vector3>();
     public Transform placementPrefabsTransform;
 
-    public Vector2 gridOffset = new Vector2(0, 0);
     public Vector3 gridCenter = new Vector3(0, 0, 0);
     private void Awake()
     {
@@ -73,9 +72,10 @@ public class PlacementManager : MonoBehaviour
         gridSize = GameManager.instance.levelConfiguration.gridSize;
         percentageOfEnvironment = GameManager.instance.levelConfiguration.environmentAmount;
 
-        DoGrid();
         tilesOccupied = 0;
         posOccupied.Clear();
+
+        DoGrid();
         DoBoss();
         DoEnvironment();
     }
@@ -83,14 +83,9 @@ public class PlacementManager : MonoBehaviour
     {
         gridModel.transform.localScale = new Vector3(gridSize.x, 0.1f, gridSize.y);
 
-        float moveX = gridSize.x % 2 == 0 ? 0 : 0.5f;
-        float moveY = gridSize.y % 2 == 0 ? 0 : 0.5f;
-        gridOffset = new Vector2(moveX, moveY);
-
         gridCenter = new Vector3(gridSize.x / 2f, 0, gridSize.y / 2f);
 
-        //gridModel.transform.position += new Vector3(gridOffset.x, 0, gridOffset.y) ;
-        gridModel.transform.position = new Vector3(gridCenter.x, 0, gridCenter.z);
+        gridModel.transform.position = new Vector3(gridCenter.x, -0.01f, gridCenter.z);
 
         OnGridReplaced?.Invoke(gridModel.transform);
         gridModel.GetComponent<MeshRenderer>().material.mainTextureScale = gridSize / 2;
@@ -111,18 +106,17 @@ public class PlacementManager : MonoBehaviour
                 y = UnityEngine.Random.Range(0, gridSize.y);
                 vector = new Vector2Int(x, y);
             }
-            while (posOccupied.Exists(x => x.Equals(GetCorrectedPointForBuilding( ToGridPosition(new Vector3(vector.x, 0.5f, vector.y)), environmentPrefab.size)))
-            && !IsGridComplete()
-            );
+            while (posOccupied.Exists(x => x.Equals(GetCorrectedPointForBuilding( new Vector3(vector.x, 0.5f, vector.y), environmentPrefab.size)))
+            && !IsGridComplete());
 
-            PlaceEnvironment(environmentPrefab, GetCorrectedPointForBuilding(ToGridPosition(new Vector3(vector.x, 0, vector.y)),environmentPrefab.size));
+            PlaceEnvironment(environmentPrefab, GetCorrectedPointForBuilding(new Vector3(vector.x, 0, vector.y),environmentPrefab.size));
             amount--;
         }
     }
     void DoBoss()
     {
         boss = GameManager.instance.levelConfiguration.bossPrefab;
-        PlaceBoss(boss, GetCorrectedPointForBuilding( ToGridPosition(new Vector3(gridSize.x / 2f, 0, gridSize.y / 2f)), boss.size));
+        PlaceBoss(boss, GetCorrectedPointForBuilding( new Vector3(gridSize.x / 2f, 0, gridSize.y / 2f), boss.size));
     }
     
     void AddBuildingPlaced(Building building) {
@@ -184,9 +178,8 @@ public class PlacementManager : MonoBehaviour
 
         if (Physics.Raycast(ray, out hit, Mathf.Infinity, 1<<6))
         {
-            var gridPoint = ToGridPosition(hit.point);
             
-            var gridPointForBuilding = GetCorrectedPointForBuilding(gridPoint, prefabVisual.size);
+            var gridPointForBuilding = GetCorrectedPointForBuilding(hit.point, prefabVisual.size);
 
             if (prefabVisual != null)
             {   
@@ -210,8 +203,9 @@ public class PlacementManager : MonoBehaviour
         return new Vector3(x+ cellSize / 2 , 0.5f, y + cellSize / 2 );
     }
     //Despues lo veo
-    public Vector3 GetCorrectedPointForBuilding(Vector3 gridPoint, Vector2Int size)
+    public Vector3 GetCorrectedPointForBuilding(Vector3 normalPoint, Vector2Int size)
     {
+        var gridPoint = ToGridPosition(normalPoint);
         float moveX = size.x % 2 == 0 ? -0.5f : 0f;
         float moveY = size.y % 2 == 0 ? -0.5f : 0f;
 
@@ -240,7 +234,6 @@ public class PlacementManager : MonoBehaviour
         if (current.onCooldown) return false;
         if (!GameManager.instance.HasGold(current.goldCost)) return false;
         if (!IsPlaceFreeAndObjectIsOnGrid(point, prefabVisual.size)) return false;
-        if (!AreNeighboursOfDifferentType(point)) return false;
 
 
         PlaceBuildingFromLowBar(point, current.type);
@@ -254,15 +247,16 @@ public class PlacementManager : MonoBehaviour
         if (!IsObjectOnGrid(gridPointCorrected,size)) { Debug.Log("Object Outside grid"); return false; };
         return true;
     }
-    
-    bool IsPlaceFree(Vector3 hit, Vector2Int size)
+
+    //Checks if the places is free 
+    bool IsPlaceFree(Vector3 gridPoint, Vector2Int size)
     {
-        drawHit = hit;
+        drawHit = gridPoint;
         drawSize = new Vector3(size.x, 1, size.y) * 0.8f;
 
-        return Physics.OverlapBox(hit, new Vector3(size.x, 1, size.y) * 0.4f, Quaternion.identity, 1 << 10)
+        return Physics.OverlapBox(gridPoint, new Vector3(size.x, 1, size.y) * 0.4f, Quaternion.identity, 1 << 10)
             .Select(x => x.GetComponent<Building>())
-            .Count(x => x.constructionStatus != ConstructionStatus.VISUAL) == 0 && IsOnGrid(hit);
+            .Count(x => x.constructionStatus != ConstructionStatus.VISUAL) == 0 && IsOnGrid(gridPoint);
     }
     private bool IsOnGrid(Vector3 hit) =>  hit.x > 0 && hit.x < gridSize.x && hit.z > 0 && hit.z < gridSize.y;
 
@@ -289,53 +283,42 @@ public class PlacementManager : MonoBehaviour
    
     private bool IsObjectOnGrid(Vector3 hit, Vector2Int buildingSize) {
         var pos = GetPosWithSize(hit, buildingSize);
-        bool isOnGrid = true;
+        
         for (int i = 0; i < pos.Count; i++) {
-            isOnGrid = IsOnGrid(pos[i]);
-            if (!isOnGrid)
-            {
+            if (!IsOnGrid(pos[i])) {
                 Debug.Log("Object outside grid");
                 return false;
             }
         }
         return true;
     }
-    
-    bool AreNeighboursOfDifferentType(Vector3 hit) {
-        Collider[] colliders = Physics.OverlapSphere(hit, 1, 1 << 10);
-        var t = prefabVisual.GetComponent<Building>().type;
-        return !(colliders.Length == 9 && colliders.Select(x => x.gameObject.GetComponent<Building>()).All(x => x.type == t));
-    }
-
 
     void PlaceEnvironment(Building prefab, Vector3 point)
     {
-        var go = Instantiate(prefab);
-        go.transform.position = point;
-        go.Place(go.constructionTime, null);
-        AddBuildingPlaced(go);
+        PlaceBuilding(prefab, point, prefab.constructionTime, true, null);
     }
 
     void PlaceBoss(Building prefab, Vector3 point)
     {
-        var go = Instantiate(prefab);
-        go.transform.position = point;
-        go.Place(go.constructionTime, null, false);
-        AddBuildingPlaced(go);
+        PlaceBuilding(prefab, point, prefab.constructionTime, false, null);
     }
-    //....
 
     #region PUBLIC METHODS
     public void PlaceBuildingFromLowBar(Vector3 point, BuildingType type)
     {
         var pref = placementPrefabs[type];
-        var go = Instantiate(pref.item.prefab);
-        //go.transform.position = GetCorrectedPointForBuilding(point, go.size); // ya esta corregido
-        go.transform.position = point;
-        go.Place(pref.item.constructionTime, pref.item.upgrades);
-        AddBuildingPlaced(go);
-
+        PlaceBuilding(pref.item.prefab, point, pref.item.constructionTime, true, pref.item.upgrades);
     }
+    void PlaceBuilding(Building prefab, Vector3 point,float constructionTime = 0,  bool startConstruction = true, List<BaseUpgrade> upgrades = null) {
+        var go = Instantiate(prefab);
+        go.transform.position = point;
+        go.Place(constructionTime, upgrades, startConstruction);
+        AddBuildingPlaced(go);
+    }
+
+    //Modifiers...
+
+
     public void DecreaseConstructionTime(BuildingType type, float newAmount)
     {
         placementPrefabs[type].item.constructionTime = newAmount;

@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.UIElements;
 
 public enum ConstructionStatus {
     VISUAL,
@@ -12,6 +11,10 @@ public enum ConstructionStatus {
     ON_CONSTRUCTION,
     FINISHED
 }
+public class BaseBuildingEvent : IGameEvent{}
+public class BuildingTrioEvent : BaseBuildingEvent{}
+public class BuildingSameTypeEvent : BaseBuildingEvent { }
+
 public class Building : MonoBehaviour {
     public static Action<Building, float> OnStartConstruction;
     public BuildingType type;
@@ -26,6 +29,9 @@ public class Building : MonoBehaviour {
     public List<Building> neighbours = new();
     public Vector2Int size = new Vector2Int(1,1);
     public UnityEvent OnConstructionEndedEvent;
+
+    
+
     private void Awake()
     {
         tempModel = GetComponent<MeshRenderer>();
@@ -58,7 +64,7 @@ public class Building : MonoBehaviour {
         TimersCoroutinesManager.instance.Stop("StartConstruction" + gameObject.GetInstanceID());
     }
     void CheckForConstruction(Building building) {
-        if (building == this || building.type == BuildingType.Boss) return;
+        if (building == this || type == BuildingType.Boss) return;
 
         if (building.type == BuildingType.Road)
             StartConstruction();
@@ -80,10 +86,7 @@ public class Building : MonoBehaviour {
     }
     
     void OnBuildingConstructed(Building building) {
-
-        //TODO MEJORAR EL SISTEMA DE ENCONTRAR LOS VECINOS, QUE SE AGREGUEN A UNA LISTA DE VECINOS EN FUNCION DE onbuildingplaced
-        //aca puedo checkear de nuevo el systema de reward
-        //ej
+       
         if (type == BuildingType.Road || type == BuildingType.Environment || type == BuildingType.Boss || type == BuildingType.Pond) return;
         if (neighbours.Contains(building))
         {
@@ -157,8 +160,8 @@ public class Building : MonoBehaviour {
         int goldValue = GameManager.instance.baseRewardGold;
 
 
-        Debug.Log("Check counts for " + gameObject.name);
-        count.ToList().ForEach(x => Debug.Log("Type " + x.Key + " Amount " + x.Value));
+        //Debug.Log("Check counts for " + gameObject.name);
+        //count.ToList().ForEach(x => Debug.Log("Type " + x.Key + " Amount " + x.Value));
        
 
         if (count.ContainsKey(BuildingType.Pond))
@@ -174,10 +177,12 @@ public class Building : MonoBehaviour {
         {
             GameManager.instance.AddReward(type, sumPoints);
 
+
             CreateReward(GameManager.instance.rewardPrefab, 
                 sumPoints.ToString(), 
                 GetComponent<MeshRenderer>().material.color, 
                 transform.position.WithOffset(new Vector3(-0.5f, 1.5f, 0)));
+            EventBus.Publish(new BuildingSameTypeEvent());
         }
         switch (type)
         {
@@ -196,6 +201,8 @@ public class Building : MonoBehaviour {
 
             CreateReward(GameManager.instance.rewardPrefab, goldValue.ToString(), Color.yellow, transform.position.WithOffset(new Vector3(0.5f, 1.5f, 0)));
             CreateReward(GameManager.instance.timeRewardPrefab, timeValue.ToString(), Color.black, transform.position.WithOffset(new Vector3(1f, 1.5f, 0)));
+
+            EventBus.Publish(new BuildingTrioEvent());
         }
         if (sumMoney > 0 || sumPoints > 0) {
             var val = Mathf.Max(sumMoney, sumPoints);
@@ -204,13 +211,20 @@ public class Building : MonoBehaviour {
     }
     void CreateReward(UIReward prefab, string message, Color color, Vector3 pos) {
        var reward =  Instantiate(prefab);
-        reward.Set(message, color, pos);
+       reward.Set(message, color, pos);
     }
     
-    bool HasRoadsAlong() {
-        return neighbours.Any(x => x.type == BuildingType.Road);
-        //var colls =  Physics.OverlapBox(transform.position, Vector3.one, Quaternion.identity, 1 << 10);
-        //return colls.Length > 0 && colls.ToList().Any(x => x.gameObject.GetComponent<Building>().type == BuildingType.Road);
+    bool HasRoadsNear() => neighbours.Any(x => x.type == BuildingType.Road);
+    bool RequiresRoads(BuildingType type)
+    {
+        switch (type)
+        {
+            case BuildingType.Industries: return true;
+            case BuildingType.Farm: return true;
+            case BuildingType.Housing: return true;
+            case BuildingType.Boss: return true;
+            default: return false;
+        }
     }
     public void Place(float constructionTime = 0, List<BaseUpgrade> upgrades = null, bool startConstruction = true)
     {
@@ -236,7 +250,7 @@ public class Building : MonoBehaviour {
     public void StartConstruction() {
         if (constructionStatus != ConstructionStatus.PLACED) return;
 
-        if (!HasRoadsAlong() && RequiresRoads(type)) return;
+        if (!HasRoadsNear() && RequiresRoads(type)) return;
 
         constructionStatus = ConstructionStatus.ON_CONSTRUCTION;
         PlacementManager.OnConstructionFinished -= CheckForConstruction;
@@ -261,15 +275,7 @@ public class Building : MonoBehaviour {
     public void TriggerStartConstructionEvent() {
         OnStartConstruction?.Invoke(this, constructionTime);
     }
-    bool RequiresRoads(BuildingType type) {
-        switch (type) { 
-            case BuildingType.Industries: return true;
-            case BuildingType.Farm: return true;
-            case BuildingType.Housing: return true;
-            case BuildingType.Boss: return true;
-            default : return false;
-        } 
-    }
+   
     private void OnDrawGizmos()
     {
         var checkbox = new Vector3(size.x + area, 1, size.y + area) ;

@@ -23,7 +23,7 @@ public class GameManager : MonoBehaviour
 
 
     public LevelConfigurationSO levelConfiguration;
-    public int currentLevel = 1;
+    public int currentLevel = 0;
     public List<LevelConfigurationSO> levels; 
 
     private GameStatus status;
@@ -75,11 +75,32 @@ public class GameManager : MonoBehaviour
     {
         PlacementManager.OnBuildingPlaced += AddBuilding;
         PlacementManager.OnConstructionFinished += CheckForBossEnd;
+        EventBus.Subscribe<TutorialEndedEvent>(OnTutorialEnded);
     }
     private void OnDisable()
     {
         PlacementManager.OnBuildingPlaced -= AddBuilding;
         PlacementManager.OnConstructionFinished -= CheckForBossEnd;
+        EventBus.UnSubscribe<TutorialEndedEvent>(OnTutorialEnded);
+    }
+    private void Start()
+    {
+        startButton.onClick.AddListener(StartGame);
+        closeTalentButton.onClick.AddListener(CloseTalents);
+        points = new SerializedDictionary<BuildingType, int>();
+
+        points.Add(BuildingType.Housing, 0);
+        points.Add(BuildingType.Farm, 0);
+        points.Add(BuildingType.Industries, 0);
+        points.Add(BuildingType.Gold, extraStartingGold);
+
+        if (currentLevel == 0)// it means there is a tutorial{}
+        {
+            EventBus.Publish(new TutorialStartEvent());
+        }
+        else {
+            ChangeLevel();
+        } 
     }
 
     private void CheckForBossEnd(Building building)
@@ -90,29 +111,22 @@ public class GameManager : MonoBehaviour
             EndGame(false);
         }
     }
-
-    private void Start()
-    {
-        startButton.onClick.AddListener(StartGame);
-        closeTalentButton.onClick.AddListener(CloseTalents);
-        points = new SerializedDictionary<BuildingType, int>();
-       
-        points.Add(BuildingType.Housing, 0);
-        points.Add(BuildingType.Farm, 0);
-        points.Add(BuildingType.Industries, 0);
-        points.Add(BuildingType.Gold, extraStartingGold);
-
-        
-
+    void OnTutorialEnded(TutorialEndedEvent e) {
+        bossEnd.gameObject.SetActive(true);
+        bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"Congratulations!! \n Tutorial complete !!";
+        Invoke("CloseTalents", 3f);
+        ChangeLevel();
+        //StartGame();
     }
-    public void AddBuilding(Building building) { 
+    
+    void AddBuilding(Building building) { 
         buildings.Add(building);
     }
     public void ChangeLevel() {
-        if (currentLevel <= levels.Count)
+        if (currentLevel < levels.Count)
         {
             currentLevel++;
-            levelConfiguration = levels[currentLevel - 1];
+            levelConfiguration = levels[currentLevel];
         }
         else {
             bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"You won!!";
@@ -185,6 +199,7 @@ public class GameManager : MonoBehaviour
         status = gameStatus;
     }
     void GoToFinishGame() {
+        bossEnd.gameObject.SetActive(false);
         ChangeStatus(GameStatus.RESOURCES_EARNED);
         finishGameCanvas.gameObject.SetActive(true);
         finishGameCanvas.Set(roundPoints);
@@ -199,6 +214,7 @@ public class GameManager : MonoBehaviour
     void CloseTalents() {
         talentCanvas.SetActive(false);
         startCanvas.SetActive(true);
+        bossEnd.gameObject.SetActive(false);
     }
 
     #region Data

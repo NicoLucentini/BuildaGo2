@@ -136,7 +136,7 @@ public class AddConstructionNear : BaseUpgrade {
             var size = PlacementManager.instance.placementPrefabs[other].item.prefab.size;
             var sizedDirection = new Vector3(direction[i].x * size.x, 0, direction[i].z * size.y);
             var pos = building.transform.position + direction[i];
-            var gridPointCorrected = PlacementManager.instance.GetCorrectedPointForBuilding(PlacementManager.instance.ToGridPosition(pos), size);
+            var gridPointCorrected = PlacementManager.instance.GetCorrectedPointForBuilding(pos, size);
             if (PlacementManager.instance.IsPlaceFreeAndObjectIsOnGrid(gridPointCorrected, size)){
                 PlacementManager.instance.PlaceBuildingFromLowBar(gridPointCorrected, other);
                 break;
