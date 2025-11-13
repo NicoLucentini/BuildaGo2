@@ -1,140 +1,258 @@
+using AYellowpaper.SerializedCollections;
+using System;
 using System.Collections;
-using System.Security.Cryptography;
+using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
+    enum GameStatus
+    {
+        PLAYING,
+        BOSS_END,
+        TALENTS,
+        RESOURCES_EARNED
+    }
+    public static Action OnStartGame;
+    public static Action OnGameEnd;
+
     public static GameManager instance;
 
-    public static event System.Action OnEndTurn;
-    public static event System.Action OnStartTurn;
 
-    public Building selectedBuilding;
+    public LevelConfigurationSO levelConfiguration;
+    public int currentLevel = 1;
+    public List<LevelConfigurationSO> levels; 
 
-    public Data<int> energy = new Data<int>(0);
-    public Data<int> money = new Data<int>(0);
-    private int totalEnergy = 0;
+    private GameStatus status;
+
+    [SerializeField]public int extraTimeBeforeDestruction = 0;
+    [SerializeField]public int extraStartingGold = 0;
+    [SerializeField]public int timer;
+
+    public SerializedDictionary<BuildingType, int> points;
+    public SerializedDictionary<BuildingType, int> roundPoints;
+   
+    public List<Building> buildings=new List<Building>();
+
+    public int baseRewardTime = 0;
+    public int baseRewardGold = 0;
 
     [Header("UI")]
+    public TextMeshProUGUI timerText;
+    public Button startButton;
+    public Button closeTalentButton;
+    public GameObject startCanvas;
+    public GameObject gameCanvas;
+    public GameObject resourcesCanvas;
+    public UIFinishGameCanvas finishGameCanvas;
+    public GameObject talentCanvas;
+    public GameObject bossEnd;
+    private Coroutine gameTimerCoroutine;
 
-    [SerializeField]
-    private UIBuildingLaborSetup uiBuildingLaborSetup;
-    [SerializeField]
-    private Button startLaborBtn;
-    [SerializeField]
-    private Button endWeekBtn;
-    [SerializeField]
-    private TextMeshProUGUI energyText;
-    
+    public SerializedDictionary<BuildingType, TextMeshProUGUI> pointTexts; // sacar el oro de aca poque no es un BuildingType
+
+    public UIReward rewardPrefab;
+    public UIReward timeRewardPrefab;
 
     private void Awake()
     {
-        instance = this;
-
-        startLaborBtn.onClick.AddListener(StartBuilding);
-        endWeekBtn.onClick.AddListener(EndTurn);
-    }
-    private void OnEnable()
-    {
-        WorkerSelectionManager.OnChooseWorker += OnChooseWorker;
-        CardManager.OnEndCardDraw += OnEndCardDraw;
+        if (instance == null)
+        {
+            instance = this;
+        }
+        else {
+            Destroy(gameObject);
+        }
     }
     private void OnDestroy()
     {
-        WorkerSelectionManager.OnChooseWorker -= OnChooseWorker;
-        CardManager.OnEndCardDraw -= OnEndCardDraw;
+        instance = null;
     }
+    private void OnEnable()
+    {
+        PlacementManager.OnBuildingPlaced += AddBuilding;
+        PlacementManager.OnConstructionFinished += CheckForBossEnd;
+    }
+    private void OnDisable()
+    {
+        PlacementManager.OnBuildingPlaced -= AddBuilding;
+        PlacementManager.OnConstructionFinished -= CheckForBossEnd;
+    }
+
+    private void CheckForBossEnd(Building building)
+    {
+        if (building.type != BuildingType.Boss) return;
+
+        if (levelConfiguration.buildingAmount.ToList().All(x => buildings.Count(y => y.type == x.Key) >= x.Value)) {
+            EndGame(false);
+        }
+    }
+
     private void Start()
     {
-        if (energyText == null) energyText = GameObject.Find("EnergyText").GetComponent<TextMeshProUGUI>();
+        startButton.onClick.AddListener(StartGame);
+        closeTalentButton.onClick.AddListener(CloseTalents);
+        points = new SerializedDictionary<BuildingType, int>();
+       
+        points.Add(BuildingType.Housing, 0);
+        points.Add(BuildingType.Farm, 0);
+        points.Add(BuildingType.Industries, 0);
+        points.Add(BuildingType.Gold, extraStartingGold);
 
-        energy.onValueChanged += (x) => energyText.text = $"Energy: {x}";
-    }
+        
 
-    public void ConsumeEnergy(int amount) {
-        energy.Value -= amount;
     }
-    public void AddMoney(int amount)
-    {
-        money.Value += amount;
+    public void AddBuilding(Building building) { 
+        buildings.Add(building);
     }
-    public bool HasEnergy(int amount) => energy.Value >= amount;
-
-    public void Update()
-    {
-        if (Input.GetMouseButtonUp(0)) // Left mouse button released
+    public void ChangeLevel() {
+        if (currentLevel <= levels.Count)
         {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit, 1000, 1 << 10))
-            {
-                var clickedBuilding = hit.collider.gameObject.GetComponent<Building>();
-
-                BuildingSelection(clickedBuilding);
-            }
+            currentLevel++;
+            levelConfiguration = levels[currentLevel - 1];
+        }
+        else {
+            bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"You won!!";
+            //Ganasteeee
         }
     }
-    public void BuildingSelection(Building building) {
-        if (building == selectedBuilding) return;
-        if (selectedBuilding != null && selectedBuilding.isStarted) return;
+    private void StartGame()
+    {
+        int gameTime = extraTimeBeforeDestruction + levelConfiguration.timeBeforeDestruction;
+        int startGold = extraStartingGold + levelConfiguration.startingGold;
 
-        if(selectedBuilding != null)
-            uiBuildingLaborSetup.RemoveListeners(selectedBuilding);
-
-        selectedBuilding = building;
-        selectedBuilding.SelectBuilding();
-        uiBuildingLaborSetup.Setup(selectedBuilding.labors);
-
-        CameraMovement.instance.LookAtTarget(selectedBuilding.transform, false, true);
-    }
-    public void StartBuilding() {
-        if (selectedBuilding == null) return;
-        if (selectedBuilding.isStarted) return;
-
-        CameraMovement.instance.LookAtTarget(selectedBuilding.transform, true, true);
-        CardManager.instance.InitialDraw();
-        CardManager.instance.TurnDrawCards();
-        selectedBuilding.StartBuilding();
-    }
-    public void EndTurn() {
-        if (selectedBuilding == null || !selectedBuilding.isStarted) return;
-
-        OnEndTurn?.Invoke();
-        //Wait--->
-
-        //
-        StartCoroutine( DoBuildingActions());
-    }
-    IEnumerator DoBuildingActions() {
-
-        var card = selectedBuilding.CheckForBadEffect();
-        if (card != null)
+        roundPoints = new SerializedDictionary<BuildingType, int>
         {
-            var c = CardManager.instance.CreateCard(card);
-            CardManager.instance.AddCardToHand(c);
-        }
-        yield return new WaitForSeconds(1f);
-        StartTurn();
-    }
-    public void StartTurn() {
-        energy.Value = totalEnergy;
-        OnStartTurn?.Invoke();
-        CardManager.instance.TurnDrawCards();
-    }
-    void OnEndCardDraw() {
+            { BuildingType.Housing, 0 },
+            { BuildingType.Farm, 0 },
+            { BuildingType.Industries, 0 },
+            { BuildingType.Gold, 0 }
+        };
 
-        Debug.Log("GameManager: OnEndCardDraw");
-        foreach (var c in CardManager.instance.hand) {
-            c.ApplyEffectsOnStartTurn();
-        }
+        points[BuildingType.Gold] = startGold;
+        buildings.DestroyAndClearList();
+        startCanvas.SetActive(false);
+        gameCanvas.SetActive(true);
+
+        pointTexts.ToList().ForEach(x => UpdateUI(x.Key));
+
+        gameTimerCoroutine = StartCoroutine(GameTimerCoroutine(gameTime));
+
+        ChangeStatus(GameStatus.PLAYING);
+        OnStartGame?.Invoke();
     }
-    void OnChooseWorker(WorkerSO workerSo) {
-        Debug.Log($"The Worker {workerSo.workerName} has been choosen");
-        foreach (var card in workerSo.specialCards) {
-            CardManager.instance.CreateCard(card);
+    IEnumerator GameTimerCoroutine(int duration) {
+        timer = duration;
+        while (timer > 0) {
+
+            timer--;
+            timerText.text =  timer + " Seconds Left";
+            yield return new WaitForSeconds(1);
         }
-        totalEnergy += workerSo.energy;
-        energy.Value = totalEnergy;
+        EndGame();
     }
+   
+    void EndGame(bool normalFinish = true) {
+        if (status != GameStatus.PLAYING) return;
+
+        if (gameTimerCoroutine != null) 
+            StopCoroutine(gameTimerCoroutine);
+
+        OnGameEnd?.Invoke();
+
+        if (normalFinish)
+        {
+            GoToFinishGame();
+            Debug.Log("Lose Game");
+        }
+        else {
+            //MostrarCosas de boss etceeteraaa
+            //This is level finished
+
+           
+
+            bossEnd.gameObject.SetActive(true);
+            bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"Congratulations!!\nLevel {currentLevel} complete ";
+            ChangeStatus(GameStatus.BOSS_END);
+            ChangeLevel();
+        }
+        
+    }
+    void ChangeStatus(GameStatus gameStatus) { 
+        status = gameStatus;
+    }
+    void GoToFinishGame() {
+        ChangeStatus(GameStatus.RESOURCES_EARNED);
+        finishGameCanvas.gameObject.SetActive(true);
+        finishGameCanvas.Set(roundPoints);
+        gameCanvas.SetActive(false);
+    }
+    internal void GoToTalents()
+    {
+        ChangeStatus(GameStatus.TALENTS);
+        finishGameCanvas.gameObject.SetActive(false);
+        talentCanvas.gameObject.SetActive(true);
+    }
+    void CloseTalents() {
+        talentCanvas.SetActive(false);
+        startCanvas.SetActive(true);
+    }
+
+    #region Data
+    public bool HasPoints(BuildingType type, int amount)
+    {
+        return points[type] >= amount;
+    }
+    public void UsePoints(BuildingType type, int amount)
+    {
+        points[type] -= amount;
+        UpdateUI(type);
+    }
+
+    public bool HasGold(int amount)
+    {
+        return HasPoints(BuildingType.Gold, amount);
+    }
+    public void UseGold(int amount)
+    {
+        UsePoints(BuildingType.Gold, amount);
+    }
+    private void UpdateUI(BuildingType type)
+    {
+        pointTexts[type].text = points[type].ToString();
+    }
+
+    public void AddReward(BuildingType type, int amount)
+    {
+        AddPoints(type, amount);
+        roundPoints[type] += amount;
+    }
+    public int GetPoints(BuildingType type)
+    {
+        return (int)points[type];
+    }
+    public void AddPoints(BuildingType type, int amount)
+    {
+        points[type] += amount;
+        UpdateUI(type);
+    }
+    public void AddTimer(int amount) {
+        timer += amount;
+    }
+    public void AddStartingGold(int amount) {
+        extraStartingGold += amount;
+    }
+    public void AddStartingTimer(int amount) {
+        extraTimeBeforeDestruction += amount;
+    }
+    public void AddBaseRewardTime(int amount) { 
+        baseRewardTime += amount;
+    }
+    public void AddBaseRewardGold(int amount) {
+        baseRewardGold += amount;
+    }
+    #endregion
 }

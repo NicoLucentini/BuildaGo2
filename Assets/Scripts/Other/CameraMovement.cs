@@ -43,7 +43,10 @@ public class CameraMovement : MonoBehaviour
    
     public float rotateY;
 
-    enum CameraMovementType{PAN_RTS, PAN_DRAG }
+    [Header("Wasd orto")]
+    public float speed = 3f;
+    private float forwardVariation = 1;
+    enum CameraMovementType{PAN_RTS, PAN_DRAG, WASD_ORTO }
 
     
     private void Awake()
@@ -51,12 +54,19 @@ public class CameraMovement : MonoBehaviour
         instance = this;
         cam = GetComponent<Camera>();
     }
+   
     void Start()
     {
         initialPosition = transform.position;
         targetPosition = transform.position; 
         initialZoom = cam.orthographicSize;
         targetZoom = cam.orthographicSize;
+
+        if (cameraMovementType == CameraMovementType.WASD_ORTO) {
+            forwardVariation = transform.rotation.eulerAngles.y / transform.rotation.eulerAngles.x;
+
+            Debug.Log("forwardVariation " + forwardVariation);
+        }
     }
     public void Restart() {
         transform.position = initialPosition;
@@ -130,8 +140,8 @@ public class CameraMovement : MonoBehaviour
         {
             targetZoom -= scroll * zoomSpeed;
             targetZoom = Mathf.Clamp(targetZoom, zoomLimits.x, zoomLimits.y);
+            
         }
-
         cam.orthographicSize = Mathf.SmoothDamp(cam.orthographicSize, targetZoom, ref zoomVelocity, zoomSmoothTime);
 
         if (cameraMovementType == CameraMovementType.PAN_DRAG)
@@ -154,14 +164,17 @@ public class CameraMovement : MonoBehaviour
             // Smoothly move camera toward the target position
             transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref velocity, smoothTime);
         }
-        else if(cameraMovementType == CameraMovementType.PAN_RTS) {
+        else if (cameraMovementType == CameraMovementType.PAN_RTS)
+        {
 
-            if (Input.GetKeyUp(KeyCode.E)) {
+            if (Input.GetKeyUp(KeyCode.E))
+            {
 
                 float d = 10;
                 Ray ray = new Ray(transform.position, transform.forward);
                 RaycastHit hit;
-                if (Physics.Raycast(ray, out hit, 100,1<<15 )) {
+                if (Physics.Raycast(ray, out hit, 100, 1 << 15))
+                {
                     d = Vector3.Distance(transform.position, hit.point);
                 }
 
@@ -187,7 +200,7 @@ public class CameraMovement : MonoBehaviour
 
                 targetPosition = transform.position;
             }
-            
+
             Vector3 move = Vector3.zero;
 
             if (Input.mousePosition.x >= Screen.width - edgeSize)
@@ -200,16 +213,28 @@ public class CameraMovement : MonoBehaviour
                 move.z -= 1;
 
 
-            if (move.x != 0 || move.z != 0) {
+            if (move.x != 0 || move.z != 0)
+            {
                 Vector3 up = (transform.up * move.z).WithY(0);
                 targetPosition += (up + transform.right * move.x).normalized * panSpeed * Time.deltaTime;
                 transform.position = targetPosition;
             }
         }
+        else if (cameraMovementType == CameraMovementType.WASD_ORTO) {
+            var horizontal = Input.GetAxis("HorizontalCustom");
+            var vertical = Input.GetAxis("VerticalCustom");
+
+            var move = new Vector3(horizontal, 0, -vertical).normalized;
+            transform.position += ((transform.forward.WithY(0).normalized * move.z * forwardVariation) + transform.right.WithY(0).normalized * move.x) * speed * Time.deltaTime;
+        }
     }
 
     private Vector3 pivot;
-
+    public void CenterCamera(Transform target) {
+        
+        transform.rotation = Quaternion.Euler(25, 45, 0);
+        transform.position = target.position - transform.forward * 100;
+    }
     private void OnDrawGizmos()
     {
         Color color = Color.red;

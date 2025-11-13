@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using UnityEngine;
 
 public class CustomExtensions
@@ -17,6 +18,12 @@ public static class StringHelper {
     {
         return "<color=#" + ColorUtility.ToHtmlStringRGBA(col) + ">" + msg + "</color>";
     }
+    public static string Enter(this string msg) {
+        var sb = new StringBuilder(msg.Length  + Environment.NewLine.Length);
+        sb.Append(msg);
+        sb.Append(Environment.NewLine);
+        return sb.ToString();
+    }
 }
 public static class Vector3Extension {
 
@@ -30,6 +37,12 @@ public static class Vector3Extension {
     public static Vector3 WithZ(this Vector3 v, float z)
     {
         return new Vector3(v.x, v.y, z);
+    }
+    public static Vector3 WithOffset(this Vector3 v, Vector3 offset) {
+        return new Vector3(v.x, v.y, v.z) + offset;
+    }
+    public static String ToStringValues(this Vector3 v) {
+        return $"[{v.x},{v.y},{v.z}]";
     }
 }
 public static class IntExtension
@@ -48,6 +61,14 @@ public static class MathHelper
             return mapMin + (mapMax - mapMin) * coef;
         }
 
+    }
+    public static float Map2(float value, float min, float max, float mapMin, float mapMax)
+    {
+        if(value<min) return mapMin;
+        if (value > max) return mapMax;
+
+        float coef = (value - min) / max;
+        return mapMin + (mapMax - mapMin) * coef;
     }
 }
 public static class MonobehaviourExtension
@@ -72,6 +93,36 @@ public static class ListExtension {
             int k = rng.Next(n + 1); // random index between 0 and n
             (list[n], list[k]) = (list[k], list[n]); // swap
         }
+    }
+    public static void DestroyAndClearList<T>(this List<T> items, bool inmediate = false) where T : Component
+    {
+        if (items == null || items.Count == 0) return;
+
+        for (int i = items.Count - 1; i >= 0; i--)
+        {
+            if (items[i] == null) continue;
+
+            if(inmediate)
+                UnityEngine.Object.DestroyImmediate(items[i].gameObject);
+            else
+                UnityEngine.Object.Destroy(items[i].gameObject);
+        }
+        items.Clear();
+    }
+    public static void DestroyAndClearList<T>(this List<GameObject> items, bool inmediate = false) 
+    {
+        if (items == null || items.Count == 0) return;
+
+        for (int i = items.Count - 1; i >= 0; i--)
+        {
+            if (items[i] == null) continue;
+            
+            if (inmediate)
+                UnityEngine.Object.DestroyImmediate(items[i]);
+            else
+                UnityEngine.Object.Destroy(items[i]);
+        }
+        items.Clear();
     }
 }
 public static class ColorExtension
@@ -105,6 +156,17 @@ public static class DictionaryExtension {
         }
         else {
             dic.Add(type, new Data<int>(amount));
+        }
+    }
+    public static void AddOrUpgrade<T>(this Dictionary<T, int> dic, T type, int amount)
+    {
+        if (dic.ContainsKey(type))
+        {
+            dic[type] += amount;
+        }
+        else
+        {
+            dic.Add(type, amount);
         }
     }
 }
