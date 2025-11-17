@@ -185,6 +185,36 @@ public class AddPlacementPrefab : BaseUpgrade {
         return $"Creates a new building to place of type {type} \n";
     }
 }
+public class AddCheckFourChance : BaseUpgrade
+{
+    public BuildingType type;
+    public int chance;
+    public int goldEarn;
+
+    public override void Upgrade()
+    {
+        //PlacementManager.instance.AddPlacementPrefab(type, prefab);
+        PlacementManager.instance.AddUpgradeToPlacementPrefab(type, this);
+        base.Upgrade();
+    }
+    public override void Apply(Building building = null)
+    {
+        if(building.type == type)
+        {
+            if (Random.Range(0, 100) > chance) return;
+
+            if(building.HasFourInLine())
+            {
+                GameManager.instance.AddPoints(BuildingType.Gold, goldEarn);
+            }
+            base.Apply(building);
+        }
+    }
+    public override string GetDescription()
+    {
+        return $"If there are 4 of the type: {type} you have a chance: {chance}% that those building are destroyed and win gold: {goldEarn}\n";
+    }
+}
 public enum UpgradeType
 {
     ADD,

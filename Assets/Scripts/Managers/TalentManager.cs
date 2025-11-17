@@ -8,6 +8,7 @@ public class TalentManager : MonoBehaviour
     public ItemConnection uiLinePrefab;
     public UIPopup popup;
     public bool cheat;
+
     private void Awake()
     {
         instance = this;

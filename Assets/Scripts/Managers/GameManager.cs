@@ -13,6 +13,7 @@ public class GameManager : MonoBehaviour
     {
         PLAYING,
         BOSS_END,
+        TUTORIAL_END,
         TALENTS,
         RESOURCES_EARNED
     }
@@ -44,6 +45,7 @@ public class GameManager : MonoBehaviour
     public TextMeshProUGUI timerText;
     public Button startButton;
     public Button closeTalentButton;
+    public Button finishTurn;
     public GameObject startCanvas;
     public GameObject gameCanvas;
     public GameObject resourcesCanvas;
@@ -87,6 +89,7 @@ public class GameManager : MonoBehaviour
     {
         startButton.onClick.AddListener(StartGame);
         closeTalentButton.onClick.AddListener(CloseTalents);
+        finishTurn.onClick.AddListener(() => EndGame(true, false));
         points = new SerializedDictionary<BuildingType, int>();
 
         points.Add(BuildingType.Housing, 0);
@@ -94,12 +97,12 @@ public class GameManager : MonoBehaviour
         points.Add(BuildingType.Industries, 0);
         points.Add(BuildingType.Gold, extraStartingGold);
 
-        if (currentLevel == 0)// it means there is a tutorial{}
+        if (currentLevel == 0)// it means there is a tutorial
         {
             EventBus.Publish(new TutorialStartEvent());
         }
         else {
-            ChangeLevel();
+            SetLevel();
         } 
     }
 
@@ -112,25 +115,31 @@ public class GameManager : MonoBehaviour
         }
     }
     void OnTutorialEnded(TutorialEndedEvent e) {
-        bossEnd.gameObject.SetActive(true);
-        bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"Congratulations!! \n Tutorial complete !!";
-        Invoke("CloseTalents", 3f);
-        ChangeLevel();
-        //StartGame();
+        EndGame(false, true);
     }
     
     void AddBuilding(Building building) { 
         buildings.Add(building);
+        timer--;
+    }
+    public void RemoveBuilding(Building building)
+    {
+        if (buildings.Contains(building)){ 
+            buildings.Remove(building);
+        }
+    }
+    private bool SetLevel() {
+        if (currentLevel < levels.Count) { 
+            levelConfiguration = levels[currentLevel];
+            return true;
+        }
+        return false;
     }
     public void ChangeLevel() {
-        if (currentLevel < levels.Count)
-        {
-            currentLevel++;
-            levelConfiguration = levels[currentLevel];
-        }
-        else {
+        currentLevel++;
+
+        if (!SetLevel()) {
             bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"You won!!";
-            //Ganasteeee
         }
     }
     private void StartGame()
@@ -162,14 +171,14 @@ public class GameManager : MonoBehaviour
         timer = duration;
         while (timer > 0) {
 
-            timer--;
-            timerText.text =  timer + " Seconds Left";
-            yield return new WaitForSeconds(1);
+            //timer--;
+            timerText.text =  timer + " Movements Left";
+            yield return null;
         }
         EndGame();
     }
    
-    void EndGame(bool normalFinish = true) {
+    void EndGame(bool normalFinish = true, bool isTutorial = false) {
         if (status != GameStatus.PLAYING) return;
 
         if (gameTimerCoroutine != null) 
@@ -185,13 +194,18 @@ public class GameManager : MonoBehaviour
         else {
             //MostrarCosas de boss etceeteraaa
             //This is level finished
-
-           
-
             bossEnd.gameObject.SetActive(true);
-            bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"Congratulations!!\nLevel {currentLevel} complete ";
-            ChangeStatus(GameStatus.BOSS_END);
+            if (isTutorial)
+            {
+                bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"Congratulations!! \n Tutorial complete !!";
+                ChangeStatus(GameStatus.TUTORIAL_END);
+            }
+            else { 
+                bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"Congratulations!!\nLevel {currentLevel} complete ";
+                ChangeStatus(GameStatus.BOSS_END);
+            }
             ChangeLevel();
+            Invoke("CloseTalents", 3f);
         }
         
     }

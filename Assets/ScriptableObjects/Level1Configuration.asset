@@ -17,7 +17,7 @@ MonoBehaviour:
     _serializedList:
     - Key: 7
       Value: 1
-  gridSize: {x: 10, y: 10}
+  gridSize: {x: 11, y: 11}
   timeBeforeDestruction: 60
-  startingGold: 999
+  startingGold: 100
   bossPrefab: {fileID: -6800061734087120901, guid: 2b7e2c30f406dd84999d0e889b5ad41d, type: 3}

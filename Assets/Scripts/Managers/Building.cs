@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Events;
+using static UnityEditor.PlayerSettings;
 
 public enum ConstructionStatus {
     VISUAL,
@@ -30,7 +31,7 @@ public class Building : MonoBehaviour {
     public Vector2Int size = new Vector2Int(1,1);
     public UnityEvent OnConstructionEndedEvent;
 
-    
+    public List<Vector3> posOccupied = new();
 
     private void Awake()
     {
@@ -70,19 +71,17 @@ public class Building : MonoBehaviour {
             StartConstruction();
     }
     void OnBuildingPlaced(Building building) {
+        if (building == this) return;
+        if (neighbours.Contains(building)) return;
+
         StartCoroutine(WaitForOneFrame(building));
     }
     IEnumerator WaitForOneFrame(Building building) {
         yield return new WaitForSeconds(0.5f);
-        if (building == this) yield break;
-        if (neighbours.Contains(building)) yield break;
+      
         if (!FindExistingNeighbours().Contains(building)) yield break;
 
         neighbours.Add(building);
-
-        //Aca puedo calcular el premio de vuelta, pero solo con uno
-
-
     }
     
     void OnBuildingConstructed(Building building) {
@@ -90,6 +89,7 @@ public class Building : MonoBehaviour {
         if (type == BuildingType.Road || type == BuildingType.Environment || type == BuildingType.Boss || type == BuildingType.Pond) return;
         if (neighbours.Contains(building))
         {
+            /*
             if (building.type == type) {
                 //Add reward by 1
                 GameManager.instance.AddReward(type, 1);
@@ -98,7 +98,7 @@ public class Building : MonoBehaviour {
                 GetComponent<MeshRenderer>().material.color,
                 transform.position.WithOffset(new Vector3(-0.5f, 1.5f, 0)));
             }
-
+            */
             /*
             if (HasNeighborsOfTypes(building, BuildingType.Housing, BuildingType.Farm, BuildingType.Industries)) {
                 GameManager.instance.AddReward(BuildingType.Gold, 1);
@@ -124,7 +124,7 @@ public class Building : MonoBehaviour {
     }
     
     void ApplyUpgrades(UpgradeTarget target) { 
-        if(upgrades == null || upgrades.Count == 0) return;
+        if(upgrades == null) return;
 
         upgrades.ForEach(x =>
         {
@@ -136,13 +136,12 @@ public class Building : MonoBehaviour {
     }
     List<Building> FindExistingNeighbours()
     {
-        var checkbox = new Vector3(size.x + area, 1, size.y + area) / 2;
+        var checkbox = new Vector3(size.x + area, 1, size.y + area) / 2f;
         Collider[] colliders = Physics.OverlapBox(transform.position, checkbox, Quaternion.identity, 1 << 10);
         return colliders.Select(x => x.GetComponent<Building>()).Where(x=> x != this && x.constructionStatus != ConstructionStatus.VISUAL).ToList();
     }
     void CalculateAndAddReward() {
         if (type == BuildingType.Road || type == BuildingType.Environment || type == BuildingType.Boss || type == BuildingType.Pond) return;
-
 
         Dictionary<BuildingType, int> count =  CreateEmptyCounts();
        
@@ -160,10 +159,6 @@ public class Building : MonoBehaviour {
         int goldValue = GameManager.instance.baseRewardGold;
 
 
-        //Debug.Log("Check counts for " + gameObject.name);
-        //count.ToList().ForEach(x => Debug.Log("Type " + x.Key + " Amount " + x.Value));
-       
-
         if (count.ContainsKey(BuildingType.Pond))
         {
             //timeValue += 1;
@@ -175,13 +170,14 @@ public class Building : MonoBehaviour {
         //Same Type buildings
         if (sumPoints > 0)
         {
+
+            //esto podria ir para otro lado
             GameManager.instance.AddReward(type, sumPoints);
-
-
             CreateReward(GameManager.instance.rewardPrefab, 
                 sumPoints.ToString(), 
                 GetComponent<MeshRenderer>().material.color, 
                 transform.position.WithOffset(new Vector3(-0.5f, 1.5f, 0)));
+
             EventBus.Publish(new BuildingSameTypeEvent());
         }
         switch (type)
@@ -209,13 +205,55 @@ public class Building : MonoBehaviour {
             SoundManager.instance.PlaySfx(MathHelper.Map2(val,1,5, 0.3f, 0.7f));
         }
     }
+    public bool HasFourInLine() {
+
+        var countL = CountDirection(transform.position, Vector3.left);
+        var countR = CountDirection(transform.position, Vector3.right);
+
+        if (countL.Count + countR.Count +1 >= 4) {
+
+            countL.ForEach(x => x.DestroyBuilding());
+            countR.ForEach(x => x.DestroyBuilding());
+            DestroyBuilding();
+            return true;
+        }
+       
+
+        var countF = CountDirection(transform.position, Vector3.forward);
+        var countB = CountDirection(transform.position, Vector3.back);
+        if (countF.Count + countB.Count + 1 >= 4) {
+            countF.ForEach(x => x.DestroyBuilding());
+            countB.ForEach(x => x.DestroyBuilding());
+            DestroyBuilding();
+            return true;
+        }
+        return false;
+    }
+    List<Building> CountDirection(Vector3 start, Vector3 dir)
+    {
+        int c = 0;
+        Vector3 p = start + dir;
+        List<Building> n = new List<Building>();
+        while (c <=4)
+        {
+            var b = PlacementManager.instance.TryGetBuilding(p);
+
+            if (b == null || b.constructionStatus != ConstructionStatus.FINISHED || b.type != type) break;
+
+            c++;
+            p += dir;
+            n.Add(b);
+
+        }
+        return n;
+    }
     void CreateReward(UIReward prefab, string message, Color color, Vector3 pos) {
        var reward =  Instantiate(prefab);
        reward.Set(message, color, pos);
     }
     
     bool HasRoadsNear() => neighbours.Any(x => x.type == BuildingType.Road);
-    bool RequiresRoads(BuildingType type)
+    public static bool RequiresRoads(BuildingType type)
     {
         switch (type)
         {
@@ -233,6 +271,7 @@ public class Building : MonoBehaviour {
         gameObject.name = "Building" + type + GameManager.instance.buildings.Count;
 
         constructionStatus = ConstructionStatus.PLACED;
+
         PlacementManager.OnBuildingPlaced?.Invoke(this);
 
         ApplyUpgrades(UpgradeTarget.BUILDING_PLACED);
@@ -244,6 +283,7 @@ public class Building : MonoBehaviour {
         {
             StartConstruction();
         }
+
 
     }
     //its used in editor
@@ -275,7 +315,10 @@ public class Building : MonoBehaviour {
     public void TriggerStartConstructionEvent() {
         OnStartConstruction?.Invoke(this, constructionTime);
     }
-   
+    public void DestroyBuilding() {
+        PlacementManager.instance.RemoveBuilding(this);
+        Destroy(gameObject);
+    }
     private void OnDrawGizmos()
     {
         var checkbox = new Vector3(size.x + area, 1, size.y + area) ;

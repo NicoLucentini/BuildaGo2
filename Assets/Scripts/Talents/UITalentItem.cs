@@ -12,14 +12,26 @@ using UnityEngine.UI;
 public class UITalentItem : MonoBehaviour , IPointerClickHandler , IPointerEnterHandler, IPointerExitHandler{
 
     public TalentItem item;
+   
+    public List<UITalentItem> nodes;
+
+    [Header("Ui")]
+
+    public List<ItemConnection> connections;
     public Image image;
     public GameObject blocked;
     public Outline outline;
-
-    public List<UITalentItem> nodes;
-    private List<ItemConnection> connections = new();
     public TextMeshProUGUI talentLevel;
 
+    public void OnValidate()
+    {
+        item.to?.Clear();
+        foreach (var node in nodes)
+        {
+            AddTo(node.item);
+        }
+        OnTalentModified();
+    }
     void OnEnable() {
         item.OnTalentModified += OnTalentModified;
         UpdateText();
@@ -43,18 +55,9 @@ public class UITalentItem : MonoBehaviour , IPointerClickHandler , IPointerEnter
     }
     void UpdateText() {
         talentLevel.gameObject.SetActive(true);
-        talentLevel.text = item.status == TalentStatus.USED ? "MAX" : $" {(item.upgradeAmount - item.remainingUpgrades)}/{item.upgradeAmount}";
+        talentLevel.text = item.status == TalentStatus.USED ? "MAX" : $" {item.upgradesDone}/{item.upgradeAmount}";
     }
-    public void OnValidate()
-    {
-        //item.from?.Clear();
-        item.to?.Clear();
-        foreach (var node in nodes) {
-            AddTo(node.item);
-            //node.AddFrom(item);
-        }
-        OnTalentModified();
-    }
+    
     public void AddTo(TalentItem to) {
         item.to.Add(to);
     }
@@ -69,6 +72,7 @@ public class UITalentItem : MonoBehaviour , IPointerClickHandler , IPointerEnter
     public void DrawConnections(ItemConnection prefab)
     {
         RemoveConnections();
+        connections = new();
         if (nodes == null) return;
         foreach(var node in nodes)
         {
@@ -83,15 +87,6 @@ public class UITalentItem : MonoBehaviour , IPointerClickHandler , IPointerEnter
         go.transform.SetAsFirstSibling();
         go.Set(this, node);
         connections.Add(go);
-
-        UnityEditor.EditorUtility.SetDirty(go);
-        var so = new SerializedObject(go);
-        so.ApplyModifiedProperties();
-        var so2 = new SerializedObject(this);
-        so2.ApplyModifiedProperties();
-        UnityEditor.EditorUtility.SetDirty(this);
-        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
-       UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
     }
     public void RemoveConnections() {
         connections.DestroyAndClearList(true);
@@ -108,8 +103,7 @@ public class UITalentItem : MonoBehaviour , IPointerClickHandler , IPointerEnter
         TooltipSystem.instance.Show(item.DoDescription(), GetComponent<RectTransform>().position + new Vector3(150,150,0));
     }
     public void OnPointerExit(PointerEventData eventData)
-    {
-        if (item.status == TalentStatus.USED || item.status == TalentStatus.HIDE) return;
+    {  
         TooltipSystem.instance.Hide();
     }
 }
@@ -123,7 +117,7 @@ public class TalentItem // Podria ser scriptable object
     public string description;
     public Sprite img;
     public int upgradeAmount = 0;
-    public int remainingUpgrades;// just 1
+    public int upgradesDone = 0;
     public TalentStatus status;
     public SerializedDictionary<BuildingType, int> cost;
     [SerializeReference] public List<BaseUpgrade> upgrades = new List<BaseUpgrade>();    
@@ -146,8 +140,10 @@ public class TalentItem // Podria ser scriptable object
         ChangeStatus(TalentStatus.LOCKED);
     } // it can be discovered but not used
     public void Unlock() {
+
+        if (!requirements.All(x => x.Evaluate() == true)) { TalentManager.instance.ShowPopup("Talents requirements not matched"); return; };
+
         ChangeStatus(TalentStatus.CAN_BE_USED);
-        remainingUpgrades = upgradeAmount;
         to.ForEach(x => x.Show());
     } // it can be used
     public void Upgrade() {
@@ -157,14 +153,13 @@ public class TalentItem // Podria ser scriptable object
 
         cost.ToList().ForEach(x => GameManager.instance.UsePoints(x.Key, x.Value));
 
-        to.ForEach(x => x.Unlock());
 
         upgrades.ForEach(x=>x.Upgrade());
-        remainingUpgrades--;
-        if (remainingUpgrades == 0) {
+        upgradesDone++;
+        if (upgradeAmount - upgradesDone == 0) {
             ChangeStatus(TalentStatus.USED);
         }
-        
+        to.ForEach(x => x.Unlock());
         OnTalentModified?.Invoke();
     } 
     bool HasEnough() {
@@ -193,6 +188,15 @@ public class LevelRequirement : ITalentRequirement
     public bool Evaluate()
     {
         return true;
+    }
+}
+[Serializable]
+    
+public class PreviousNodeLevel : ITalentRequirement {
+    public List<UITalentItem> previousNodes;
+    public int amount;
+    public bool Evaluate() {
+       return previousNodes.All(x => amount >= x.item.upgradesDone || x.item.status == TalentStatus.USED);
     }
 }
 [Serializable]
