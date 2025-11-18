@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Events;
-using static UnityEditor.PlayerSettings;
 
 public enum ConstructionStatus {
     VISUAL,
@@ -13,8 +12,33 @@ public enum ConstructionStatus {
     FINISHED
 }
 public class BaseBuildingEvent : IGameEvent{}
-public class BuildingTrioEvent : BaseBuildingEvent{}
-public class BuildingSameTypeEvent : BaseBuildingEvent { }
+public class BuildingTrioEvent : BaseBuildingEvent{
+    public int goldReward;
+    public int timeReward;
+
+    public BuildingTrioEvent(int goldReward, int timeReward)
+    {
+        this.goldReward = goldReward;
+        this.timeReward = timeReward;
+    }
+}
+public class BuildingSameTypeEvent : BaseBuildingEvent {
+    public int amount;
+    public BuildingType type;
+    public BuildingSameTypeEvent(int amount, BuildingType type)
+    {
+        this.type = type;
+        this.amount = amount;
+    }
+}
+
+public class BuildingFinishedEvent : BaseBuildingEvent {
+    public readonly Building building;
+    public BuildingFinishedEvent(Building building) { 
+        this.building = building;
+    }
+}
+
 
 public class Building : MonoBehaviour {
     public static Action<Building, float> OnStartConstruction;
@@ -172,13 +196,14 @@ public class Building : MonoBehaviour {
         {
 
             //esto podria ir para otro lado
-            GameManager.instance.AddReward(type, sumPoints);
+            //GameManager.instance.AddReward(type, sumPoints);
+            
             CreateReward(GameManager.instance.rewardPrefab, 
                 sumPoints.ToString(), 
                 GetComponent<MeshRenderer>().material.color, 
                 transform.position.WithOffset(new Vector3(-0.5f, 1.5f, 0)));
 
-            EventBus.Publish(new BuildingSameTypeEvent());
+            EventBus.Publish(new BuildingSameTypeEvent(sumPoints, type));
         }
         switch (type)
         {
@@ -192,13 +217,13 @@ public class Building : MonoBehaviour {
             timeValue += sumMoney;
             goldValue += sumMoney;
 
-            GameManager.instance.AddReward(BuildingType.Gold, goldValue);
-            GameManager.instance.AddTimer(timeValue);
+            //GameManager.instance.AddReward(BuildingType.Gold, goldValue);
+            //GameManager.instance.AddTimer(timeValue);
 
             CreateReward(GameManager.instance.rewardPrefab, goldValue.ToString(), Color.yellow, transform.position.WithOffset(new Vector3(0.5f, 1.5f, 0)));
             CreateReward(GameManager.instance.timeRewardPrefab, timeValue.ToString(), Color.black, transform.position.WithOffset(new Vector3(1f, 1.5f, 0)));
 
-            EventBus.Publish(new BuildingTrioEvent());
+            EventBus.Publish(new BuildingTrioEvent(goldValue, timeValue));
         }
         if (sumMoney > 0 || sumPoints > 0) {
             var val = Mathf.Max(sumMoney, sumPoints);
@@ -294,6 +319,7 @@ public class Building : MonoBehaviour {
 
         constructionStatus = ConstructionStatus.ON_CONSTRUCTION;
         PlacementManager.OnConstructionFinished -= CheckForConstruction;
+        
         TriggerStartConstructionEvent();
         new Timer("StartConstruction"+ gameObject.GetInstanceID(), constructionTime, OnConstructionEnded).Start();
     }
@@ -305,6 +331,7 @@ public class Building : MonoBehaviour {
         tempModel.enabled = false;
 
         OnConstructionEndedEvent?.Invoke();
+        EventBus.Publish(new BuildingFinishedEvent(this));
         constructionStatus = ConstructionStatus.FINISHED;
 
         ApplyUpgrades(UpgradeTarget.BUILDING_FINISHED);

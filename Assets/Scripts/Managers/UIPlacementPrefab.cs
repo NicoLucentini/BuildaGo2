@@ -22,7 +22,7 @@ public class UIPlacementPrefab : MonoBehaviour{
     }
     public void UpdateUI(PlacementPrefabs pref)
     {
-        costText.text = item.goldCost.ToString();
+        costText.text = item.GetCostToString();
     }
 }
 /*

@@ -19,5 +19,5 @@ MonoBehaviour:
       Value: 1
   gridSize: {x: 15, y: 15}
   timeBeforeDestruction: 60
-  startingGold: 100
+  startingGold: 50
   bossPrefab: {fileID: -6800061734087120901, guid: 2b7e2c30f406dd84999d0e889b5ad41d, type: 3}

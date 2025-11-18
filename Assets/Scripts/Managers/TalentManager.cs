@@ -26,7 +26,8 @@ public class TalentManager : MonoBehaviour
     {
         foreach (var item in items)
         {
-            item.DrawConnections(uiLinePrefab);
+            if(item.gameObject.activeSelf)
+                item.DrawConnections(uiLinePrefab);
         }
     }
     internal void ClearNodes() {

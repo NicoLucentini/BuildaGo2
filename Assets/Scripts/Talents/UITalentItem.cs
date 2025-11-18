@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -141,6 +140,8 @@ public class TalentItem // Podria ser scriptable object
     } // it can be discovered but not used
     public void Unlock() {
 
+        if (this.status != TalentStatus.LOCKED) return;
+
         if (!requirements.All(x => x.Evaluate() == true)) { TalentManager.instance.ShowPopup("Talents requirements not matched"); return; };
 
         ChangeStatus(TalentStatus.CAN_BE_USED);
@@ -196,7 +197,7 @@ public class PreviousNodeLevel : ITalentRequirement {
     public List<UITalentItem> previousNodes;
     public int amount;
     public bool Evaluate() {
-       return previousNodes.All(x => amount >= x.item.upgradesDone || x.item.status == TalentStatus.USED);
+       return previousNodes.All(x =>  x.item.upgradesDone >= amount || x.item.status == TalentStatus.USED);
     }
 }
 [Serializable]

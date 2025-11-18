@@ -6,7 +6,6 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-
 public class GameManager : MonoBehaviour
 {
     enum GameStatus
@@ -78,12 +77,61 @@ public class GameManager : MonoBehaviour
         PlacementManager.OnBuildingPlaced += AddBuilding;
         PlacementManager.OnConstructionFinished += CheckForBossEnd;
         EventBus.Subscribe<TutorialEndedEvent>(OnTutorialEnded);
+        EventBus.Subscribe<BuildingFinishedEvent>(OnBuildingFinishedEvent);
+        EventBus.Subscribe<BuildingTrioEvent>(OnBuildingTrioEvent);
+        EventBus.Subscribe<BuildingSameTypeEvent>(OnBuildingSameType);
     }
     private void OnDisable()
     {
         PlacementManager.OnBuildingPlaced -= AddBuilding;
         PlacementManager.OnConstructionFinished -= CheckForBossEnd;
         EventBus.UnSubscribe<TutorialEndedEvent>(OnTutorialEnded);
+        EventBus.UnSubscribe<BuildingFinishedEvent>(OnBuildingFinishedEvent);
+        EventBus.UnSubscribe<BuildingTrioEvent>(OnBuildingTrioEvent);
+        EventBus.UnSubscribe<BuildingSameTypeEvent>(OnBuildingSameType);
+    }
+
+    void OnBuildingSameType(BuildingSameTypeEvent e)
+    {
+        AddReward(e.type, e.amount);
+    }
+
+    void OnBuildingTrioEvent(BuildingTrioEvent e)
+    {
+        
+        AddReward(BuildingType.Gold, e.goldReward);
+        AddTimer(e.timeReward);
+    }
+    void OnBuildingFinishedEvent(BuildingFinishedEvent e) {
+        if (e.building.type == BuildingType.Industries)
+        {
+            AddReward(BuildingType.Gold, 1);
+        }
+        else if (e.building.type == BuildingType.Housing) {
+            AddReward(BuildingType.Housing, 1);
+        }
+        else if (e.building.type == BuildingType.Farm)
+        {
+            AddReward(BuildingType.Farm, 1);
+        }
+
+        if(timer <= 0) { 
+            EndGame();
+        }
+    }
+    void AddPoints(BuildingFinishedEvent b) {
+        if(b.building.type == BuildingType.Housing || b.building.type == BuildingType.Industries || b.building.type == BuildingType.Farm)
+        { 
+            AddReward(b.building.type, b.building.type == BuildingType.Housing ? 2 : 1);
+
+            //granja da comida 2
+            //industrias da 1 oro
+            if (b.building.type == BuildingType.Industries) {
+                if ((GetPoints(BuildingType.Housing) - GetPoints(BuildingType.Farm) - GetPoints(BuildingType.Industries) >= 0)){
+                    AddPoints(BuildingType.Gold, 1);
+                }
+            }
+        }
     }
     private void Start()
     {
@@ -96,6 +144,14 @@ public class GameManager : MonoBehaviour
         points.Add(BuildingType.Farm, 0);
         points.Add(BuildingType.Industries, 0);
         points.Add(BuildingType.Gold, extraStartingGold);
+
+        roundPoints = new SerializedDictionary<BuildingType, int>
+        {
+            { BuildingType.Housing, 0 },
+            { BuildingType.Farm, 0 },
+            { BuildingType.Industries, 0 },
+            { BuildingType.Gold, 0 }
+        };
 
         if (currentLevel == 0)// it means there is a tutorial
         {
@@ -147,6 +203,13 @@ public class GameManager : MonoBehaviour
         int gameTime = extraTimeBeforeDestruction + levelConfiguration.timeBeforeDestruction;
         int startGold = extraStartingGold + levelConfiguration.startingGold;
 
+        roundPoints[BuildingType.Housing] = 0;
+        roundPoints[BuildingType.Farm] = 0;
+        roundPoints[BuildingType.Industries] = 0;
+        roundPoints[BuildingType.Gold] = 0;
+
+        points[BuildingType.Gold] = startGold;
+        /*
         roundPoints = new SerializedDictionary<BuildingType, int>
         {
             { BuildingType.Housing, 0 },
@@ -156,6 +219,7 @@ public class GameManager : MonoBehaviour
         };
 
         points[BuildingType.Gold] = startGold;
+        */
         buildings.DestroyAndClearList();
         startCanvas.SetActive(false);
         gameCanvas.SetActive(true);
@@ -175,7 +239,6 @@ public class GameManager : MonoBehaviour
             timerText.text =  timer + " Movements Left";
             yield return null;
         }
-        EndGame();
     }
    
     void EndGame(bool normalFinish = true, bool isTutorial = false) {
@@ -240,6 +303,23 @@ public class GameManager : MonoBehaviour
     {
         points[type] -= amount;
         UpdateUI(type);
+    }
+    public int TryGetRoundPoints(BuildingType type) {
+        if (roundPoints == null) return 0;
+
+        if (roundPoints.ContainsKey(type)) { 
+            return roundPoints[type];
+        }
+        return 0;
+    }
+    public void ConsumeRoundPoints(BuildingType type,int amount)
+    {
+        if (roundPoints == null) return;
+
+        if (roundPoints.ContainsKey(type))
+        {
+            roundPoints[type] -= amount;
+        }
     }
 
     public bool HasGold(int amount)

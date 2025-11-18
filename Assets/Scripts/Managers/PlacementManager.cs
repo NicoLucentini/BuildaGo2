@@ -239,15 +239,17 @@ public class PlacementManager : MonoBehaviour
     public bool OnGroundClick(Vector3 point)
     {
         if (current.onCooldown) return false;
-        if (!GameManager.instance.HasGold(current.goldCost)) return false;
+        //if (!GameManager.instance.HasGold(current.goldCost)) return false;
+        if (!current.HasEnough()) { Debug.Log("Not Enough money"); return false; }
         if (!IsPlaceFreeAndObjectIsOnGrid(point, prefabVisual.size)) return false;
         if (!CheckRoadsConnected(point)) return false;
-        if (!CheckBuildingsWithRoads(point, prefabVisual.size)) return false;
+        if (!HasRoadsNear(point, prefabVisual.size)) return false;
         if (current.type == BuildingType.Road && !roadInitialized) {
             roadInitialized = true;
         }
         PlaceBuildingFromLowBar(prefabVisual.transform.position, current.type);
-        GameManager.instance.UseGold(current.goldCost);
+        //GameManager.instance.UseGold(current.goldCost);
+        current.ConsumePoints();
         current.OnCooldown(true);
         new Timer("BuildingCooldown" + gameObject.GetInstanceID(), current.cooldown, () => current.OnCooldown(false)).Start();
         return true;
@@ -268,7 +270,7 @@ public class PlacementManager : MonoBehaviour
         }
         return false;
     }
-    bool CheckBuildingsWithRoads(Vector3 point, Vector2Int size) {
+    bool HasRoadsNear(Vector3 point, Vector2Int size) {
         if (current.type == BuildingType.Road || current.type == BuildingType.Boss || current.type == BuildingType.Environment) return true;
 
         return Physics.OverlapBox(point, (Vector3.one + new Vector3(size.x, 0, size.y))/2f, Quaternion.identity, 1<<10).Any(x=>x.GetComponent<Building>().type == BuildingType.Road);
@@ -427,22 +429,23 @@ public enum BuildingType {
 
 [Serializable]
 public class PlacementPrefabs {
+    public SerializedDictionary<BuildingType, int> cost = new SerializedDictionary<BuildingType, int>();
     public Building prefab;
     public float cooldown;
     public bool onCooldown = false;
     public float constructionTime;
     public int goldCost;
-    [SerializeReference]public List<BaseUpgrade> upgrades = new();
+    [SerializeReference] public List<BaseUpgrade> upgrades = new();
     public string description;
     public BuildingType type;
 
     public Action<PlacementPrefabs> OnChanged;
     public string GetDescription() {
-        if(description == "")
-        { 
+        if (description == "")
+        {
             description = $"Place a {type}\n" +
                 $"Construction Time: {constructionTime} \n" +
-                $"Cost: {goldCost}";
+                $"Cost: {GetCostToString()}";
         }
         return description;
 
@@ -454,11 +457,34 @@ public class PlacementPrefabs {
         this.goldCost = goldAmount;
         OnChanged?.Invoke(this);
     }
+    public string GetCostToString() {
+        string val = "";
+
+        foreach (var c in cost.Keys) {
+            val += $" {c} : {cost[c]} \n ";
+        }
+        val = val.Trim();
+        return val;
+
+    }
     public void AddUpgrade(BaseUpgrade upgrade)
     {
         upgrades.Add(upgrade);
     }
-   
+    public bool HasEnough() {
+        foreach (var k in cost.Keys) {
+            if (GameManager.instance.GetPoints(k) < cost[k]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    public void ConsumePoints() {
+        foreach (var k in cost.Keys)
+        {
+            GameManager.instance.UsePoints(k, cost[k]);
+        }
+    } 
 }
 /*
 public class Condition {
