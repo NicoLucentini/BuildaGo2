@@ -124,13 +124,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   type: 1
   model: {fileID: 7812568317523652059}
+  constructionTime: 0
   upgrades: []
   constructionStatus: 0
   area: 1
   neighbours: []
+  size: {x: 1, y: 1}
+  OnConstructionEndedEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  posOccupied: []
+  mega: {fileID: 0}
+  basedRewards:
+    _serializedList: []
+  placementRequirements:
+  - rid: 362274180239458376
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 362274180239458376
+      type: {class: RoadsNear, ns: , asm: Game}
+      data: 
 --- !u!1 &7812568317523652059
 GameObject:
   m_ObjectHideFlags: 0
@@ -146,7 +160,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &4024008741138206414
 Transform:
   m_ObjectHideFlags: 0

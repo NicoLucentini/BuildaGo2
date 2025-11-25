@@ -13,27 +13,29 @@ public class PlacementManager : MonoBehaviour
     public static Action<Building> OnConstructionFinished;
     public static Action<Building> OnBuildingPlaced;
     public static Action AllTilesComplete;
-    public float cellSize = 1f;
-    public Vector2Int gridSize = new Vector2Int(20, 20);
 
+    public float cellSize = 1f;
+  
     public GameObject gridModel;
     public Building environmentPrefab;
-    public float percentageOfEnvironment;
 
-    //public SerializedDictionary<BuildingType, PlacementPrefabs> placementPrefabs;
+    public SerializedDictionary<Vector3, Building> posOccupied = new SerializedDictionary<Vector3, Building>();
+
+    [Header("UI")]
     public SerializedDictionary<BuildingType, UIPlacementPrefab> placementPrefabs;
+    public Transform placementPrefabsTransform;
+
 
     PlacementPrefabs current;
     private Building prefabVisual;
+    private Building boss;
+    private Vector2Int gridSize = new Vector2Int(20, 20);
+    private float percentageOfEnvironment;
+    private int tilesOccupied = 0;
 
-    public Building boss;
-    public int tilesOccupied = 0;
-    public SerializedDictionary<Vector3, Building> posOccupied = new SerializedDictionary<Vector3, Building>();
-    public Transform placementPrefabsTransform;
+    private Vector3 gridCenter = new Vector3(0, 0, 0);
 
-    public Vector3 gridCenter = new Vector3(0, 0, 0);
-
-    private bool roadInitialized = false;
+    bool enableControls = false;
     private void Awake()
     {
         instance = this;
@@ -65,16 +67,18 @@ public class PlacementManager : MonoBehaviour
         GameManager.OnGameEnd -= OnGameEnd;
         OnConstructionFinished -= CheckForAllTiles;
     }
+   
     void OnGameEnd()
     {
         DestroyPrefabVisual();
+        enableControls = false;
     }
     void OnStartGame() {
 
         gridSize = GameManager.instance.levelConfiguration.gridSize;
         percentageOfEnvironment = GameManager.instance.levelConfiguration.environmentAmount;
 
-        roadInitialized = false;
+        enableControls = true;
 
         tilesOccupied = 0;
         posOccupied.Clear();
@@ -203,6 +207,22 @@ public class PlacementManager : MonoBehaviour
             }
 
         }
+        if (!enableControls) return;
+        if (Input.GetKeyUp(KeyCode.Alpha1)) {
+            OnSelectPrefab(placementPrefabs[BuildingType.Houses].item);
+        }
+        else if (Input.GetKeyUp(KeyCode.Alpha2))
+        {
+            OnSelectPrefab(placementPrefabs[BuildingType.Farms].item);
+        }
+        else if (Input.GetKeyUp(KeyCode.Alpha3))
+        {
+            OnSelectPrefab(placementPrefabs[BuildingType.Industries].item);
+        }
+        else if (Input.GetKeyUp(KeyCode.Alpha4))
+        {
+            OnSelectPrefab(placementPrefabs[BuildingType.Roads].item);
+        }
     }
 
     public Vector3 ToGridPosition(Vector3 hit) {
@@ -210,7 +230,6 @@ public class PlacementManager : MonoBehaviour
         var y = Mathf.FloorToInt(hit.z);
         return new Vector3(x + cellSize / 2, 0.5f, y + cellSize / 2);
     }
-    //Despues lo veo
     public Vector3 GetCorrectedPointForBuilding(Vector3 normalPoint, Vector2Int size)
     {
         var gridPoint = ToGridPosition(normalPoint);
@@ -242,11 +261,8 @@ public class PlacementManager : MonoBehaviour
         //if (!GameManager.instance.HasGold(current.goldCost)) return false;
         if (!current.HasEnough()) { Debug.Log("Not Enough money"); return false; }
         if (!IsPlaceFreeAndObjectIsOnGrid(point, prefabVisual.size)) return false;
-        if (!CheckRoadsConnected(point)) return false;
-        if (!HasRoadsNear(point, prefabVisual.size)) return false;
-        if (current.type == BuildingType.Road && !roadInitialized) {
-            roadInitialized = true;
-        }
+        if (!prefabVisual.AllRequirementsMet(this, GameManager.instance, prefabVisual, point)) return false;
+
         PlaceBuildingFromLowBar(prefabVisual.transform.position, current.type);
         //GameManager.instance.UseGold(current.goldCost);
         current.ConsumePoints();
@@ -254,34 +270,14 @@ public class PlacementManager : MonoBehaviour
         new Timer("BuildingCooldown" + gameObject.GetInstanceID(), current.cooldown, () => current.OnCooldown(false)).Start();
         return true;
     }
-    bool CheckRoadsConnected(Vector3 point) {
-
-        if (current.type != BuildingType.Road) return true;
-
-        if (!roadInitialized) return true;
-
-        Vector3[] arr = new Vector3[4] { Vector3.forward, Vector3.back, Vector3.right, Vector3.left };
-
-        for (int i = 0; i < 4; i++) { 
-            var v = TryGetBuilding(point + arr[i]);
-            if (v != null && v.type == BuildingType.Road) {
-                return true;
-            }
-        }
-        return false;
-    }
-    bool HasRoadsNear(Vector3 point, Vector2Int size) {
-        if (current.type == BuildingType.Road || current.type == BuildingType.Boss || current.type == BuildingType.Environment) return true;
-
-        return Physics.OverlapBox(point, (Vector3.one + new Vector3(size.x, 0, size.y))/2f, Quaternion.identity, 1<<10).Any(x=>x.GetComponent<Building>().type == BuildingType.Road);
-    }
     public bool IsPlaceFreeAndObjectIsOnGrid(Vector3 gridPointCorrected, Vector2Int size) {
         if (!IsPlaceFree(gridPointCorrected, size)) { Debug.Log("Place is Occupied"); return false; }
         if (!IsObjectOnGrid(gridPointCorrected, size)) { Debug.Log("Object Outside grid"); return false; }; 
         return true;
     }
 
-    //Checks if the places is free 
+    private Vector3 drawHit;
+    private Vector3 drawSize;
     bool IsPlaceFree(Vector3 gridPoint, Vector2Int size)
     {
         drawHit = gridPoint;
@@ -289,15 +285,27 @@ public class PlacementManager : MonoBehaviour
 
         return Physics.OverlapBox(gridPoint, new Vector3(size.x, 1, size.y) * 0.4f, Quaternion.identity, 1 << 10)
             .Select(x => x.GetComponent<Building>())
-            .Count(x => x.constructionStatus != ConstructionStatus.VISUAL) == 0 && IsOnGrid(gridPoint);
+            .Count(x => x.constructionStatus != ConstructionStatus.VISUAL) == 0;
     }
-    private bool IsOnGrid(Vector3 hit) => hit.x > 0 && hit.x < gridSize.x && hit.z > 0 && hit.z < gridSize.y;
+    bool IsPointOnGrid(Vector3 hit) => hit.x > 0 && hit.x < gridSize.x && hit.z > 0 && hit.z < gridSize.y;
+    bool IsObjectOnGrid(Vector3 hit, Vector2Int buildingSize)
+    {
+        var pos = GetPosWithSize(hit, buildingSize);
 
-
+        for (int i = 0; i < pos.Count; i++)
+        {
+            if (!IsPointOnGrid(pos[i]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    bool IsGridComplete() => tilesOccupied == gridSize.x * gridSize.y;
     void CheckForAllTiles(Building building) {
         new Timer("Check Fo All", 1f, CheckForAllTilesCompleteExceptBoss).Start();
     }
-    bool IsGridComplete() => tilesOccupied == gridSize.x * gridSize.y;
+    
     public void CheckForAllTilesCompleteExceptBoss() {
 
         Debug.Log("CheckForAllTilesCompleteExceptBoss");
@@ -309,21 +317,6 @@ public class PlacementManager : MonoBehaviour
     }
     bool AllBuildingsConstructedExceptBoss() {
         return GameManager.instance.buildings.Where(x => x.type != BuildingType.Boss).All(x => x.constructionStatus == ConstructionStatus.FINISHED);
-    }
-
-    private Vector3 drawHit;
-    private Vector3 drawSize;
-
-    private bool IsObjectOnGrid(Vector3 hit, Vector2Int buildingSize) {
-        var pos = GetPosWithSize(hit, buildingSize);
-
-        for (int i = 0; i < pos.Count; i++) {
-            if (!IsOnGrid(pos[i])) {
-                Debug.Log("Object outside grid");
-                return false;
-            }
-        }
-        return true;
     }
 
     void PlaceEnvironment(Building prefab, Vector3 point)
@@ -340,9 +333,11 @@ public class PlacementManager : MonoBehaviour
     public void PlaceBuildingFromLowBar(Vector3 point, BuildingType type)
     {
         var pref = placementPrefabs[type];
+
+        GameManager.instance.timer--;
         PlaceBuilding(pref.item.prefab, point, pref.item.constructionTime, true, pref.item.upgrades);
     }
-    void PlaceBuilding(Building prefab, Vector3 point, float constructionTime = 0, bool startConstruction = true, List<BaseUpgrade> upgrades = null) {
+    public void PlaceBuilding(Building prefab, Vector3 point, float constructionTime = 0, bool startConstruction = true, List<BaseUpgrade> upgrades = null) {
         var go = Instantiate(prefab);
         go.transform.position = point;
         go.Place(constructionTime, upgrades, startConstruction);
@@ -369,7 +364,13 @@ public class PlacementManager : MonoBehaviour
     }
     //Modifiers...
 
-
+    public PlacementPrefabs TryGetPlacementPrefab(BuildingType type) {
+        if (placementPrefabs.ContainsKey(type)) {
+            return placementPrefabs[type].item;
+        }
+        return null;
+    }
+    
     public void DecreaseConstructionTime(BuildingType type, float newAmount)
     {
         placementPrefabs[type].item.constructionTime = newAmount;
@@ -415,20 +416,21 @@ public class PlacementManager : MonoBehaviour
 }
 
 public enum BuildingType { 
-    Housing,
-    Farm,
+    Houses,
+    Farms,
     Industries,
-    Road,
+    Roads,
     Gold,
     Pond,
     Environment,
-    Boss
+    Boss,
+    River
 }
 
 //Podria ser scriptable object...
 
 [Serializable]
-public class PlacementPrefabs {
+public class PlacementPrefabs  {
     public SerializedDictionary<BuildingType, int> cost = new SerializedDictionary<BuildingType, int>();
     public Building prefab;
     public float cooldown;
@@ -437,17 +439,19 @@ public class PlacementPrefabs {
     public int goldCost;
     [SerializeReference] public List<BaseUpgrade> upgrades = new();
     public string description;
+    [TextArea(1,5)]public string extraDescription;
     public BuildingType type;
+    public bool isFree = false;
 
     public Action<PlacementPrefabs> OnChanged;
     public string GetDescription() {
         if (description == "")
         {
             description = $"Place a {type}\n" +
-                $"Construction Time: {constructionTime} \n" +
+                $"Construction Time: {constructionTime}\n" +
                 $"Cost: {GetCostToString()}";
         }
-        return description;
+        return description + "\n" + extraDescription; ;
 
     }
     public void OnCooldown(bool on) {
@@ -461,7 +465,7 @@ public class PlacementPrefabs {
         string val = "";
 
         foreach (var c in cost.Keys) {
-            val += $" {c} : {cost[c]} \n ";
+            val += $"{c} : {cost[c]}\n";
         }
         val = val.Trim();
         return val;
@@ -472,6 +476,7 @@ public class PlacementPrefabs {
         upgrades.Add(upgrade);
     }
     public bool HasEnough() {
+        if (isFree) return true;
         foreach (var k in cost.Keys) {
             if (GameManager.instance.GetPoints(k) < cost[k]) {
                 return false;
@@ -480,47 +485,44 @@ public class PlacementPrefabs {
         return true;
     }
     public void ConsumePoints() {
+        if (isFree) return;
+
         foreach (var k in cost.Keys)
         {
             GameManager.instance.UsePoints(k, cost[k]);
         }
-    } 
+    }
 }
-/*
-public class Condition {
-    public Func<bool> pred = ()=> true;
-    bool and = false;
-    Condition next;
 
-    public Condition(Func<bool> pred) {
-        this.pred = pred;
-    }
-    public Condition And(Condition condition) {
-        next = condition;
-        and = true;
-        return this;
-    }
-    public Condition Or(Condition condition)
+
+public interface IPlacementRequirement {
+    bool Evaluate(PlacementManager placement, GameManager game, Building b, Vector3 point);
+}
+public class CrossCondition : IPlacementRequirement
+{
+    public BuildingType type;
+    public bool Evaluate(PlacementManager placement, GameManager game, Building b, Vector3 point)
     {
-        next = condition;
-        and = false;
-        return this;
-    }
-    public Condition And(Func<bool> condition) { 
-        return And(new Condition(condition));
-    }
-    public Condition Or(Func<bool> condition) {
-        return Or(new Condition(condition));
-    }
-   
-    public bool Evaluate() {
-        if (next != null)
+        if (b.type != type) return true;
+        if (game.GetBuildingCount(type) == 0) return true;
+        Vector3[] arr = new Vector3[4] { Vector3.forward, Vector3.back, Vector3.right, Vector3.left };
+
+        for (int i = 0; i < 4; i++)
         {
-            return and ? pred.Invoke() && next.Evaluate() : pred.Invoke() || next.Evaluate();
+            var v = placement.TryGetBuilding(point + arr[i]);
+            if (v != null && v.type == type)
+            {
+                return true;
+            }
         }
-        else {
-            return pred.Invoke();
-        }
+        return false;
     }
 }
-*/
+public class RoadsNear : IPlacementRequirement
+{
+    public bool Evaluate(PlacementManager placement, GameManager game, Building b, Vector3 point)
+    {
+        return Physics.OverlapBox(point, (Vector3.one + new Vector3(b.size.x, 0, b.size.y)) / 2f, Quaternion.identity, 1 << 10)
+            .Any(x => x.GetComponent<Building>().type == BuildingType.Roads);
+    }
+}

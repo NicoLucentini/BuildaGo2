@@ -208,12 +208,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6d89f7c2a5b88dd4da87ed08c9661405, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  type: 3
+  type: 8
   model: {fileID: 1856523451055493871}
+  constructionTime: 0
   upgrades: []
   constructionStatus: 0
   area: 1
   neighbours: []
+  size: {x: 1, y: 1}
+  OnConstructionEndedEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  posOccupied: []
+  mega: {fileID: 0}
+  basedRewards:
+    _serializedList: []
+  placementRequirements:
+  - rid: 362274180239458378
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 362274180239458378
+      type: {class: CrossCondition, ns: , asm: Game}
+      data:
+        type: 8

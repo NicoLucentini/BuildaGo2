@@ -1,4 +1,5 @@
-﻿using System;
+﻿using AYellowpaper.SerializedCollections;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,33 +11,6 @@ public enum ConstructionStatus {
     PLACED,
     ON_CONSTRUCTION,
     FINISHED
-}
-public class BaseBuildingEvent : IGameEvent{}
-public class BuildingTrioEvent : BaseBuildingEvent{
-    public int goldReward;
-    public int timeReward;
-
-    public BuildingTrioEvent(int goldReward, int timeReward)
-    {
-        this.goldReward = goldReward;
-        this.timeReward = timeReward;
-    }
-}
-public class BuildingSameTypeEvent : BaseBuildingEvent {
-    public int amount;
-    public BuildingType type;
-    public BuildingSameTypeEvent(int amount, BuildingType type)
-    {
-        this.type = type;
-        this.amount = amount;
-    }
-}
-
-public class BuildingFinishedEvent : BaseBuildingEvent {
-    public readonly Building building;
-    public BuildingFinishedEvent(Building building) { 
-        this.building = building;
-    }
 }
 
 
@@ -57,6 +31,13 @@ public class Building : MonoBehaviour {
 
     public List<Vector3> posOccupied = new();
 
+    public Building mega;
+
+    public SerializedDictionary<BuildingType, int> basedRewards = new();
+
+    [SerializeReference]
+    public List<IPlacementRequirement> placementRequirements = new();
+
     private void Awake()
     {
         tempModel = GetComponent<MeshRenderer>();
@@ -64,13 +45,16 @@ public class Building : MonoBehaviour {
     public static Dictionary<BuildingType, int> CreateEmptyCounts() {
         Dictionary<BuildingType, int> dic = new Dictionary<BuildingType, int>
         {
-            { BuildingType.Housing, 0 },
-            { BuildingType.Road, 0 },
-            { BuildingType.Farm, 0 },
+            { BuildingType.Houses, 0 },
+            { BuildingType.Roads, 0 },
+            { BuildingType.Farms, 0 },
             { BuildingType.Industries, 0 }//,
             //{ BuildingType.Pond, 0 }
         };
         return dic;
+    }
+    public bool AllRequirementsMet(PlacementManager placement, GameManager game, Building b, Vector3 point) {
+        return placementRequirements.All(x => x.Evaluate(placement, game, b, point));
     }
     void SubscribeToEvents() {
         PlacementManager.OnConstructionFinished += OnBuildingConstructed;
@@ -91,7 +75,7 @@ public class Building : MonoBehaviour {
     void CheckForConstruction(Building building) {
         if (building == this || type == BuildingType.Boss) return;
 
-        if (building.type == BuildingType.Road)
+        if (building.type == BuildingType.Roads)
             StartConstruction();
     }
     void OnBuildingPlaced(Building building) {
@@ -110,29 +94,10 @@ public class Building : MonoBehaviour {
     
     void OnBuildingConstructed(Building building) {
        
-        if (type == BuildingType.Road || type == BuildingType.Environment || type == BuildingType.Boss || type == BuildingType.Pond) return;
+        if (type == BuildingType.Roads || type == BuildingType.Environment || type == BuildingType.Boss || type == BuildingType.Pond) return;
         if (neighbours.Contains(building))
         {
-            /*
-            if (building.type == type) {
-                //Add reward by 1
-                GameManager.instance.AddReward(type, 1);
-                CreateReward(GameManager.instance.rewardPrefab,
-                1.ToString(),
-                GetComponent<MeshRenderer>().material.color,
-                transform.position.WithOffset(new Vector3(-0.5f, 1.5f, 0)));
-            }
-            */
-            /*
-            if (HasNeighborsOfTypes(building, BuildingType.Housing, BuildingType.Farm, BuildingType.Industries)) {
-                GameManager.instance.AddReward(BuildingType.Gold, 1);
-                GameManager.instance.AddTimer(1);
-
-                CreateReward(GameManager.instance.rewardPrefab, 1.ToString(), Color.yellow, transform.position.WithOffset(new Vector3(0.5f, 1.5f, 0)));
-                CreateReward(GameManager.instance.timeRewardPrefab, 1.ToString(), Color.black, transform.position.WithOffset(new Vector3(1f, 1.5f, 0)));
-            }
-            */
-
+           
         }
 
     }
@@ -165,7 +130,7 @@ public class Building : MonoBehaviour {
         return colliders.Select(x => x.GetComponent<Building>()).Where(x=> x != this && x.constructionStatus != ConstructionStatus.VISUAL).ToList();
     }
     void CalculateAndAddReward() {
-        if (type == BuildingType.Road || type == BuildingType.Environment || type == BuildingType.Boss || type == BuildingType.Pond) return;
+        if (type == BuildingType.Roads || type == BuildingType.Environment || type == BuildingType.Boss || type == BuildingType.Pond || type == BuildingType.River) return;
 
         Dictionary<BuildingType, int> count =  CreateEmptyCounts();
        
@@ -181,8 +146,17 @@ public class Building : MonoBehaviour {
         int sumMoney = 0;
         int timeValue = GameManager.instance.baseRewardTime;
         int goldValue = GameManager.instance.baseRewardGold;
+        int riverReward = 0;
 
 
+
+        if (CheckQuad()) {
+            Debug.Log("Quad");
+        }
+        if(count.ContainsKey(BuildingType.River) ){
+            riverReward = count[BuildingType.River];
+            EventBus.Publish(new BuildingNearRiverEvent(this, riverReward));
+        }
         if (count.ContainsKey(BuildingType.Pond))
         {
             //timeValue += 1;
@@ -194,101 +168,107 @@ public class Building : MonoBehaviour {
         //Same Type buildings
         if (sumPoints > 0)
         {
-
-            //esto podria ir para otro lado
-            //GameManager.instance.AddReward(type, sumPoints);
-            
-            CreateReward(GameManager.instance.rewardPrefab, 
-                sumPoints.ToString(), 
-                GetComponent<MeshRenderer>().material.color, 
-                transform.position.WithOffset(new Vector3(-0.5f, 1.5f, 0)));
-
-            EventBus.Publish(new BuildingSameTypeEvent(sumPoints, type));
+            EventBus.Publish(new BuildingSameTypeEvent(this, sumPoints));
         }
+
+        //Trio event
         switch (type)
         {
-            case BuildingType.Housing: sumMoney += Mathf.Min(count[BuildingType.Farm], count[BuildingType.Industries]); break;
-            case BuildingType.Farm: sumMoney += Mathf.Min(count[BuildingType.Housing], count[BuildingType.Industries]); break;
-            case BuildingType.Industries: sumMoney += Mathf.Min(count[BuildingType.Farm], count[BuildingType.Housing]); break;
+            case BuildingType.Houses: sumMoney += Mathf.Min(count[BuildingType.Farms], count[BuildingType.Industries]); break;
+            case BuildingType.Farms: sumMoney += Mathf.Min(count[BuildingType.Houses], count[BuildingType.Industries]); break;
+            case BuildingType.Industries: sumMoney += Mathf.Min(count[BuildingType.Farms], count[BuildingType.Houses]); break;
             default: break;
         }
         if (sumMoney > 0)
         {
             timeValue += sumMoney;
             goldValue += sumMoney;
-
-            //GameManager.instance.AddReward(BuildingType.Gold, goldValue);
-            //GameManager.instance.AddTimer(timeValue);
-
-            CreateReward(GameManager.instance.rewardPrefab, goldValue.ToString(), Color.yellow, transform.position.WithOffset(new Vector3(0.5f, 1.5f, 0)));
-            CreateReward(GameManager.instance.timeRewardPrefab, timeValue.ToString(), Color.black, transform.position.WithOffset(new Vector3(1f, 1.5f, 0)));
-
-            EventBus.Publish(new BuildingTrioEvent(goldValue, timeValue));
+            EventBus.Publish(new BuildingTrioEvent(this, goldValue, timeValue));
         }
         if (sumMoney > 0 || sumPoints > 0) {
             var val = Mathf.Max(sumMoney, sumPoints);
             SoundManager.instance.PlaySfx(MathHelper.Map2(val,1,5, 0.3f, 0.7f));
         }
-    }
-    public bool HasFourInLine() {
+        //this could be the building finished...
+        //this is like the standar reward
+        foreach (var baser in basedRewards) { 
+            GameManager.instance.AddReward(baser.Key, baser.Value);
 
-        var countL = CountDirection(transform.position, Vector3.left);
-        var countR = CountDirection(transform.position, Vector3.right);
-
-        if (countL.Count + countR.Count +1 >= 4) {
-
-            countL.ForEach(x => x.DestroyBuilding());
-            countR.ForEach(x => x.DestroyBuilding());
-            DestroyBuilding();
-            return true;
+            UIRewardManager.instance.CreateBuildingReward(transform.position.WithOffset(0.75f, 0.25f, 0), 
+                GetComponent<MeshRenderer>().material.color, 
+                baser.Value.ToString());
+            if (baser.Key == BuildingType.Gold) {
+                UIRewardManager.instance.CreateGoldReward(transform.position.WithOffset(-0.75f, 0.25f, 0), Color.white, baser.Value.ToString());
+            }
         }
-       
+    }
+    public bool CheckQuad() {
+        Vector3[] dirs = new Vector3[] { new Vector3(0.5f, 0, 0.5f), new Vector3(0.5f, 0, -0.5f), new Vector3(-0.5f, 0, 0.5f), new Vector3(-0.5f, 0, -0.5f) };
 
-        var countF = CountDirection(transform.position, Vector3.forward);
-        var countB = CountDirection(transform.position, Vector3.back);
-        if (countF.Count + countB.Count + 1 >= 4) {
-            countF.ForEach(x => x.DestroyBuilding());
-            countB.ForEach(x => x.DestroyBuilding());
-            DestroyBuilding();
-            return true;
+        for(int i = 0; i < dirs.Length; i++)
+        {
+            Collider[] col = Physics.OverlapBox(transform.position + dirs[i], Vector3.one / 2f, Quaternion.identity, 1 << 10);
+
+            var bs = col.Select(x => x.GetComponent<Building>()).ToList();
+            if (bs.All(x => x.constructionStatus == ConstructionStatus.FINISHED && x.type == type) && bs.Count() == 4) {
+                bs.ForEach(x => x.DestroyBuilding());
+                PlacementManager.instance.PlaceBuilding(mega, transform.position + dirs[i]);
+                EventBus.Publish(new BuildingQuad(this, bs, mega));
+                return true;
+            }
+
         }
         return false;
     }
-    List<Building> CountDirection(Vector3 start, Vector3 dir)
+    public bool HasFourInLine() {
+
+        // Horizontal check
+        if (CheckAndDestroy(Vector3.left, Vector3.right))
+            return true;
+
+        // Vertical check
+        if (CheckAndDestroy(Vector3.forward, Vector3.back))
+            return true;
+
+        return false;
+    }
+    private bool CheckAndDestroy(Vector3 dirA, Vector3 dirB)
     {
-        int c = 0;
+        var listA = CountDirection(transform.position, dirA);
+        var listB = CountDirection(transform.position, dirB);
+
+        if (listA.Count + listB.Count + 1 < 4)
+            return false;
+
+        listA.AddRange(listB);
+
+        EventBus.Publish(new BuildingFourInLine(this, listA));
+
+        // Destroy all Buildings in both directions
+        foreach (var b in listA) b.DestroyBuilding();
+        //foreach (var b in listB) b.DestroyBuilding();
+        DestroyBuilding();
+
+        return true;
+    }
+    private List<Building> CountDirection(Vector3 start, Vector3 dir)
+    {
+        List<Building> result = new();
         Vector3 p = start + dir;
-        List<Building> n = new List<Building>();
-        while (c <=4)
+
+        while (true)
         {
             var b = PlacementManager.instance.TryGetBuilding(p);
 
             if (b == null || b.constructionStatus != ConstructionStatus.FINISHED || b.type != type) break;
 
-            c++;
+            result.Add(b);
             p += dir;
-            n.Add(b);
+        }
 
-        }
-        return n;
+        return result;
     }
-    void CreateReward(UIReward prefab, string message, Color color, Vector3 pos) {
-       var reward =  Instantiate(prefab);
-       reward.Set(message, color, pos);
-    }
-    
-    bool HasRoadsNear() => neighbours.Any(x => x.type == BuildingType.Road);
-    public static bool RequiresRoads(BuildingType type)
-    {
-        switch (type)
-        {
-            case BuildingType.Industries: return true;
-            case BuildingType.Farm: return true;
-            case BuildingType.Housing: return true;
-            case BuildingType.Boss: return true;
-            default: return false;
-        }
-    }
+
     public void Place(float constructionTime = 0, List<BaseUpgrade> upgrades = null, bool startConstruction = true)
     {
         this.constructionTime = constructionTime;
@@ -315,7 +295,8 @@ public class Building : MonoBehaviour {
     public void StartConstruction() {
         if (constructionStatus != ConstructionStatus.PLACED) return;
 
-        if (!HasRoadsNear() && RequiresRoads(type)) return;
+        //esto ya lo chequeo en el placement system
+        //if (!HasRoadsNear() && RequiresRoads(type)) return;
 
         constructionStatus = ConstructionStatus.ON_CONSTRUCTION;
         PlacementManager.OnConstructionFinished -= CheckForConstruction;
@@ -325,10 +306,8 @@ public class Building : MonoBehaviour {
     }
     public void OnConstructionEnded()
     {
-        if (model != null)
-            model.SetActive(true);
-
-        tempModel.enabled = false;
+        TurnOnModel();
+        TurnOffVisualModel();
 
         OnConstructionEndedEvent?.Invoke();
         EventBus.Publish(new BuildingFinishedEvent(this));
@@ -337,6 +316,13 @@ public class Building : MonoBehaviour {
         ApplyUpgrades(UpgradeTarget.BUILDING_FINISHED);
         CalculateAndAddReward();
         PlacementManager.OnConstructionFinished?.Invoke(this);
+    }
+    void TurnOnModel() {
+        if (model != null)
+            model.SetActive(true);
+    }
+    void TurnOffVisualModel() {
+        tempModel.enabled = false;
     }
     //Its used in editor
     public void TriggerStartConstructionEvent() {
@@ -351,5 +337,16 @@ public class Building : MonoBehaviour {
         var checkbox = new Vector3(size.x + area, 1, size.y + area) ;
         Gizmos.color = Color.blue;
         Gizmos.DrawWireCube(transform.position, checkbox);  
+    }
+    public static bool RequiresRoads(BuildingType type)
+    {
+        switch (type)
+        {
+            case BuildingType.Industries: return true;
+            case BuildingType.Farms: return true;
+            case BuildingType.Houses: return true;
+            case BuildingType.Boss: return true;
+            default: return false;
+        }
     }
 }

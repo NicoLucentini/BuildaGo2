@@ -188,7 +188,7 @@ public class LevelRequirement : ITalentRequirement
     public int levelAmount;
     public bool Evaluate()
     {
-        return true;
+        return GameManager.instance.currentLevel >= levelAmount;
     }
 }
 [Serializable]
@@ -198,14 +198,5 @@ public class PreviousNodeLevel : ITalentRequirement {
     public int amount;
     public bool Evaluate() {
        return previousNodes.All(x =>  x.item.upgradesDone >= amount || x.item.status == TalentStatus.USED);
-    }
-}
-[Serializable]
-public class BossRequirement : ITalentRequirement
-{
-    public int amount = 1;
-    public bool Evaluate()
-    {
-        return true;
     }
 }

@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEditor;
-
 [CustomEditor(typeof(Building))]
 public class BuildingEditor : Editor
 {

@@ -6,8 +6,9 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-public class GameManager : MonoBehaviour
+public class GameManager : MonoBehaviour, ISaver
 {
+
     enum GameStatus
     {
         PLAYING,
@@ -36,7 +37,7 @@ public class GameManager : MonoBehaviour
     public SerializedDictionary<BuildingType, int> roundPoints;
    
     public List<Building> buildings=new List<Building>();
-
+    public SerializedDictionary<BuildingType, int> countBuildings = new ();
     public int baseRewardTime = 0;
     public int baseRewardGold = 0;
 
@@ -54,9 +55,6 @@ public class GameManager : MonoBehaviour
     private Coroutine gameTimerCoroutine;
 
     public SerializedDictionary<BuildingType, TextMeshProUGUI> pointTexts; // sacar el oro de aca poque no es un BuildingType
-
-    public UIReward rewardPrefab;
-    public UIReward timeRewardPrefab;
 
     private void Awake()
     {
@@ -80,6 +78,7 @@ public class GameManager : MonoBehaviour
         EventBus.Subscribe<BuildingFinishedEvent>(OnBuildingFinishedEvent);
         EventBus.Subscribe<BuildingTrioEvent>(OnBuildingTrioEvent);
         EventBus.Subscribe<BuildingSameTypeEvent>(OnBuildingSameType);
+        EventBus.Subscribe<BuildingNearRiverEvent>(OnBuildingNearRiver);
     }
     private void OnDisable()
     {
@@ -89,48 +88,40 @@ public class GameManager : MonoBehaviour
         EventBus.UnSubscribe<BuildingFinishedEvent>(OnBuildingFinishedEvent);
         EventBus.UnSubscribe<BuildingTrioEvent>(OnBuildingTrioEvent);
         EventBus.UnSubscribe<BuildingSameTypeEvent>(OnBuildingSameType);
+        EventBus.UnSubscribe<BuildingNearRiverEvent>(OnBuildingNearRiver);
+    }
+
+    private void OnBuildingNearRiver(BuildingNearRiverEvent e)
+    {
+        switch (e.building.type) {
+            case BuildingType.Houses: AddReward(BuildingType.Gold, e.amount); break;
+            case BuildingType.Farms: AddTimer(e.amount); break;
+            case BuildingType.Industries: UseGold(e.amount); break;
+            default: break;
+        }
     }
 
     void OnBuildingSameType(BuildingSameTypeEvent e)
     {
-        AddReward(e.type, e.amount);
+        AddReward(e.building.type, e.amount);
     }
 
     void OnBuildingTrioEvent(BuildingTrioEvent e)
     {
-        
         AddReward(BuildingType.Gold, e.goldReward);
         AddTimer(e.timeReward);
     }
     void OnBuildingFinishedEvent(BuildingFinishedEvent e) {
-        if (e.building.type == BuildingType.Industries)
+        switch (e.building.type)
         {
-            AddReward(BuildingType.Gold, 1);
-        }
-        else if (e.building.type == BuildingType.Housing) {
-            AddReward(BuildingType.Housing, 1);
-        }
-        else if (e.building.type == BuildingType.Farm)
-        {
-            AddReward(BuildingType.Farm, 1);
+            case BuildingType.Houses: AddReward(BuildingType.Houses, 1); break;
+            case BuildingType.Farms: { AddReward(BuildingType.Farms, 1); ; AddTimer(1); break; }
+            case BuildingType.Industries: { AddReward(BuildingType.Gold, 1); AddReward(BuildingType.Industries, 1); } break;
+            default: break;
         }
 
         if(timer <= 0) { 
             EndGame();
-        }
-    }
-    void AddPoints(BuildingFinishedEvent b) {
-        if(b.building.type == BuildingType.Housing || b.building.type == BuildingType.Industries || b.building.type == BuildingType.Farm)
-        { 
-            AddReward(b.building.type, b.building.type == BuildingType.Housing ? 2 : 1);
-
-            //granja da comida 2
-            //industrias da 1 oro
-            if (b.building.type == BuildingType.Industries) {
-                if ((GetPoints(BuildingType.Housing) - GetPoints(BuildingType.Farm) - GetPoints(BuildingType.Industries) >= 0)){
-                    AddPoints(BuildingType.Gold, 1);
-                }
-            }
         }
     }
     private void Start()
@@ -140,15 +131,15 @@ public class GameManager : MonoBehaviour
         finishTurn.onClick.AddListener(() => EndGame(true, false));
         points = new SerializedDictionary<BuildingType, int>();
 
-        points.Add(BuildingType.Housing, 0);
-        points.Add(BuildingType.Farm, 0);
+        points.Add(BuildingType.Houses, 0);
+        points.Add(BuildingType.Farms, 0);
         points.Add(BuildingType.Industries, 0);
-        points.Add(BuildingType.Gold, extraStartingGold);
+        points.Add(BuildingType.Gold, 0);
 
         roundPoints = new SerializedDictionary<BuildingType, int>
         {
-            { BuildingType.Housing, 0 },
-            { BuildingType.Farm, 0 },
+            { BuildingType.Houses, 0 },
+            { BuildingType.Farms, 0 },
             { BuildingType.Industries, 0 },
             { BuildingType.Gold, 0 }
         };
@@ -176,12 +167,15 @@ public class GameManager : MonoBehaviour
     
     void AddBuilding(Building building) { 
         buildings.Add(building);
-        timer--;
+        countBuildings.TryAdd(building.type, 1);
     }
     public void RemoveBuilding(Building building)
     {
         if (buildings.Contains(building)){ 
             buildings.Remove(building);
+        }
+        if (countBuildings.ContainsKey(building.type)) {
+            countBuildings[building.type] -= 1;
         }
     }
     private bool SetLevel() {
@@ -203,8 +197,8 @@ public class GameManager : MonoBehaviour
         int gameTime = extraTimeBeforeDestruction + levelConfiguration.timeBeforeDestruction;
         int startGold = extraStartingGold + levelConfiguration.startingGold;
 
-        roundPoints[BuildingType.Housing] = 0;
-        roundPoints[BuildingType.Farm] = 0;
+        roundPoints[BuildingType.Houses] = 0;
+        roundPoints[BuildingType.Farms] = 0;
         roundPoints[BuildingType.Industries] = 0;
         roundPoints[BuildingType.Gold] = 0;
 
@@ -221,6 +215,7 @@ public class GameManager : MonoBehaviour
         points[BuildingType.Gold] = startGold;
         */
         buildings.DestroyAndClearList();
+        countBuildings.Clear();
         startCanvas.SetActive(false);
         gameCanvas.SetActive(true);
 
@@ -268,7 +263,7 @@ public class GameManager : MonoBehaviour
                 ChangeStatus(GameStatus.BOSS_END);
             }
             ChangeLevel();
-            Invoke("CloseTalents", 3f);
+            Invoke("GoToFinishGame", 3f);
         }
         
     }
@@ -295,6 +290,13 @@ public class GameManager : MonoBehaviour
     }
 
     #region Data
+
+    public int GetBuildingCount(BuildingType type) { 
+        if(countBuildings.ContainsKey(type))
+            return countBuildings[type];
+
+        return 0;
+    }
     public bool HasPoints(BuildingType type, int amount)
     {
         return points[type] >= amount;
@@ -346,6 +348,7 @@ public class GameManager : MonoBehaviour
     }
     public void AddPoints(BuildingType type, int amount)
     {
+        EventBus.Publish(new PointsAddedEvent(amount, type));
         points[type] += amount;
         UpdateUI(type);
     }
@@ -364,5 +367,49 @@ public class GameManager : MonoBehaviour
     public void AddBaseRewardGold(int amount) {
         baseRewardGold += amount;
     }
+
+    public void Save()
+    {
+        SaveableData data = new SaveableData()
+        {
+            level = currentLevel,
+            points = points,
+            extraStartingGold = extraStartingGold,
+            extraTime = extraTimeBeforeDestruction,
+            baseRewardGold = baseRewardGold,
+            baseRewardTime = baseRewardTime,
+        };
+        data.SaveData("GameManager", data);
+
+    }
+
+    public void Load()
+    {
+        SaveableData data = new();
+        data = data.LoadData("GameManager");
+        //ver que hacer...
+        currentLevel = data.level;
+        points = data.points;
+        extraStartingGold = data.extraStartingGold;
+        extraTimeBeforeDestruction = data.extraTime;
+        baseRewardGold = data.baseRewardGold;
+        baseRewardTime = data.baseRewardTime;
+
+    }
     #endregion
+}
+[Serializable]
+public class SaveableData : ISaveable<SaveableData>
+{
+    public int level;
+    public SerializedDictionary<BuildingType, int> points;
+    public int extraTime;
+    public int extraStartingGold;
+    public int baseRewardTime;
+    public int baseRewardGold;
+
+    public override SaveableData GetDefault()
+    {
+        return null;
+    }
 }

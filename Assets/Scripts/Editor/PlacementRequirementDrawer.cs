@@ -4,8 +4,8 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 
-[CustomPropertyDrawer(typeof(BaseEffect), true)]
-public class AbilityEffectDrawer : PropertyDrawer
+[CustomPropertyDrawer(typeof(IPlacementRequirement), true)]
+public class PlacementRequirementDrawer : PropertyDrawer
 {
     static Dictionary<string, Type> typeMap;
 
@@ -20,12 +20,12 @@ public class AbilityEffectDrawer : PropertyDrawer
         var typeName = property.managedReferenceFullTypename;
         var displayName = GetShortTypeName(typeName);
 
-        if (EditorGUI.DropdownButton(typeRect, new GUIContent(displayName ?? "Select Effect Type"), FocusType.Keyboard))
+        if (EditorGUI.DropdownButton(typeRect, new GUIContent(displayName ?? "Select Requirement Type"), FocusType.Keyboard))
         {
             var menu = new GenericMenu();
             if (typeMap == null || typeMap.Count == 0)
             {
-                menu.AddDisabledItem(new GUIContent("No Ability Effects available"));
+                menu.AddDisabledItem(new GUIContent("No Requirements available"));
                 menu.ShowAsContext();
                 return;
             }
@@ -59,7 +59,7 @@ public class AbilityEffectDrawer : PropertyDrawer
 
     static void BuildTypeMap()
     {
-        var baseType = typeof(BaseEffect);
+        var baseType = typeof(IPlacementRequirement);
         typeMap = AppDomain.CurrentDomain.GetAssemblies()
             .SelectMany(asm => {
                 try { return asm.GetTypes(); }

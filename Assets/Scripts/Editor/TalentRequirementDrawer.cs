@@ -25,7 +25,7 @@ public class TalentRequirementDrawer : PropertyDrawer
             var menu = new GenericMenu();
             if (typeMap == null || typeMap.Count == 0)
             {
-                menu.AddDisabledItem(new GUIContent("No Upgrades Effects available"));
+                menu.AddDisabledItem(new GUIContent("No Talent requirements available"));
                 menu.ShowAsContext();
                 return;
             }

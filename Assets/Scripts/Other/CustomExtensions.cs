@@ -41,6 +41,10 @@ public static class Vector3Extension {
     public static Vector3 WithOffset(this Vector3 v, Vector3 offset) {
         return new Vector3(v.x, v.y, v.z) + offset;
     }
+    public static Vector3 WithOffset(this Vector3 v,float x, float y,  float z)
+    {
+        return new Vector3(v.x +x, v.y+y, v.z+z) ;
+    }
     public static String ToStringValues(this Vector3 v) {
         return $"[{v.x},{v.y},{v.z}]";
     }

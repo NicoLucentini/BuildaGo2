@@ -23,6 +23,8 @@ public static class EventBus
         Type type = typeof(T);
         if (!subs.TryGetValue(type, out List<Delegate> list))
         {
+            if (list == null) return;
+
             list.Remove(handler);
             if(list.Count == 0) subs.Remove(type);
         }

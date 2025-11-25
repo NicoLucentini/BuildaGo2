@@ -10,6 +10,9 @@ public abstract class BaseUpgrade {
     public virtual void Upgrade() {
         TalentManager.instance.ShowPopup("Talent Applied");
     }
+    public virtual void PreApply() { 
+        
+    }
     public virtual void Apply(Building building = null) { } // this goes only for runtime upgrades
     public static float CalculatePercentageF(float initialValue, float percentage) {
         return initialValue * (percentage / 100);
@@ -185,6 +188,45 @@ public class AddPlacementPrefab : BaseUpgrade {
         return $"Creates a new building to place of type {type} \n";
     }
 }
+public class FreeItemChance : BaseUpgrade {
+    public BuildingType type;
+    public int chance;
+    public int increment;
+    public override void Upgrade()
+    {
+        var pp = PlacementManager.instance.TryGetPlacementPrefab(type);
+        if (!pp.upgrades.Contains(this))
+        {
+            PlacementManager.instance.AddUpgradeToPlacementPrefab(type, this);
+        }
+        else {
+            chance += increment;
+        }
+    }
+    public override void PreApply()
+    {
+       if(Random.Range(0, 100) < chance)
+        {
+            var pp = PlacementManager.instance.TryGetPlacementPrefab(type);
+            if (pp != null) {
+                pp.isFree = true;
+            }
+        }
+    }
+    public override void Apply(Building building = null)
+    {
+        var pp = PlacementManager.instance.TryGetPlacementPrefab(type);
+        if (pp != null)
+        {
+            pp.isFree = false;
+        }
+        base.Apply(building);
+    }
+    public override string GetDescription()
+    {
+        return $"Building {type} has a chance: {chance} to be free when applied, it increments by {increment} every upgrade \n";
+    }
+}
 public class AddCheckFourChance : BaseUpgrade
 {
     public BuildingType type;
@@ -226,7 +268,7 @@ public enum UpgradeTarget
 {
     BUILDING_FINISHED,
     BUILDING_PLACED,
-    ON_TALENT_UPGRADE
+    ON_TALENT_UPGRADE,
 }
 public static class UpgradeTypeExtension {
     public static string ToStringOverride(this UpgradeType type) {

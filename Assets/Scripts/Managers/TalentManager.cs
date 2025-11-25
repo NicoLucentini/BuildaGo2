@@ -22,7 +22,7 @@ public class TalentManager : MonoBehaviour
             }
         }
     }
-    internal void UpdateNodes()
+    public void UpdateNodes()
     {
         foreach (var item in items)
         {
@@ -30,7 +30,7 @@ public class TalentManager : MonoBehaviour
                 item.DrawConnections(uiLinePrefab);
         }
     }
-    internal void ClearNodes() {
+    public void ClearNodes() {
         foreach (var item in items)
         {
             item.RemoveConnections();

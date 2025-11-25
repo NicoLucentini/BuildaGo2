@@ -124,13 +124,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   type: 0
   model: {fileID: 9130394918349935486}
+  constructionTime: 0
   upgrades: []
   constructionStatus: 0
   area: 1
   neighbours: []
+  size: {x: 1, y: 1}
+  OnConstructionEndedEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  posOccupied: []
+  mega: {fileID: 655789793144043334, guid: abc1281837fa0044db3bd7979144070e, type: 3}
+  basedRewards:
+    _serializedList: []
+  placementRequirements:
+  - rid: 362274180239458375
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 362274180239458375
+      type: {class: RoadsNear, ns: , asm: Game}
+      data: 
 --- !u!1001 &1797419585566644527
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -145,7 +159,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7369043866839681617, guid: f39f51f88a154a444a3db50d1696c6e0, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7858723033701175531, guid: f39f51f88a154a444a3db50d1696c6e0, type: 3}
       propertyPath: m_LocalScale.x
