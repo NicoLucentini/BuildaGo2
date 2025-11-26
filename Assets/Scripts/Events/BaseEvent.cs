@@ -1,18 +1,10 @@
 
+using AYellowpaper.SerializedCollections;
 using System.Collections.Generic;
 
 public class BaseEvent : IGameEvent
 {
     
-}
-
-public class PointsAddedEvent : BaseEvent {
-    public int amount;
-    public BuildingType type;
-    public PointsAddedEvent(int amount, BuildingType type) { 
-        this.amount = amount;
-        this.type = type;
-    }
 }
 public class BaseBuildingEvent : IGameEvent {
     public readonly Building building;
@@ -72,7 +64,38 @@ public class BuildingQuad : BaseBuildingEvent
         this.prefabToInstantiate = prefabToInstantiate;
 
     }
+}
 
+public class ClickStartGameEvent : IGameEvent { }
+public class ClickFinishTurnEvent : IGameEvent { }
+
+public class GameEndEvent : IGameEvent {
+    public int level;
+    public SerializedDictionary<ResourceType, int> roundResources;
+
+    public GameEndEvent(int level,SerializedDictionary<ResourceType, int> roundResources)
+    {
+        this.level = level;
+        this.roundResources = roundResources;
+    }
+}
+public class GameStatusEvent : IGameEvent {
+    public GameStatus status;
+
+    public GameStatusEvent(GameStatus status)
+    {
+        this.status = status;
+    }
+}
+public class ResourceChangedEvent : IGameEvent {
+    public ResourceType type;
+    public int amount;
+
+    public ResourceChangedEvent(ResourceType type, int amount)
+    {
+        this.type = type;
+        this.amount = amount;
+    }
 }
 
 

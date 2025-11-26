@@ -2,7 +2,6 @@
 
 [System.Serializable]
 public abstract class BaseUpgrade {
-    public UpgradeType upgradeType;
     public UpgradeTarget target;
     public virtual string GetDescription() {
         return "";
@@ -14,99 +13,83 @@ public abstract class BaseUpgrade {
         
     }
     public virtual void Apply(Building building = null) { } // this goes only for runtime upgrades
-    public static float CalculatePercentageF(float initialValue, float percentage) {
-        return initialValue * (percentage / 100);
-    }
-    public static int CalculatePercentageInt(int initialValue, float percentage)
-    {
-        return Mathf.RoundToInt(initialValue * (percentage / 100));
-    }
+    
 }
 
 [System.Serializable]
 public class UpgradeStartingGold : BaseUpgrade
 {
     public int amount;
+    public AddType addType;
     public override void Upgrade()
     {
-        var amt = amount;
-        if (upgradeType == UpgradeType.PERC)
-        {
-            amt = CalculatePercentageInt(GameManager.instance.extraStartingGold, amount);
-        }
-        GameManager.instance.AddStartingGold(amt);    
+        var amt = GameManager.instance.GetResource(ResourceType.Extra_Start_Gold).Get(amount, addType);
+        GameManager.instance.AddResource(ResourceType.Extra_Start_Gold,amt);    
         base.Upgrade();
     }
     public override string GetDescription()
     {
-        return $"Upgrade starting Gold by {amount} {upgradeType.ToStringOverride()} \n";
+        return $"Upgrade starting Gold by {addType.ToStringOverride()} {amount}  \n";
     }
 }
 public class DecreaseConstructionTime : BaseUpgrade
 {
     public BuildingType type;
+    public AddType addType;
     public int amount;
     public override void Upgrade()
     {
-        float value = (PlacementManager.instance.GetConstructionTime(type));
-        var amt = (float)amount;
-        if (upgradeType == UpgradeType.PERC)
-        {
-            amt = CalculatePercentageF(value, amount) ;
-        }
-
+        var value = PlacementManager.instance.GetConstructionTime(type);
+        var amt = value.Get(amount, addType);
         PlacementManager.instance.DecreaseConstructionTime(type, value - amt);
         base.Upgrade();
     }
     public override string GetDescription()
     {
-        return $"Decrease construction time of {type} by {amount} {upgradeType.ToStringOverride()} \n";
+        return $"Decrease construction time of {type} by {addType.ToStringOverride()} {amount}  \n";
     }
 }
 public class DecreaseConstructionCost : BaseUpgrade
 {
     public BuildingType type;
+    public ResourceType resourceType;
     public int amount;
+    public AddType addType;
     public override void Upgrade()
     {
-        var value = PlacementManager.instance.GetConstructionCost(type);
+        var value = PlacementManager.instance.GetConstructionCost(type, resourceType);
 
-        var amt = (float)amount;
-        if (upgradeType == UpgradeType.PERC)
-        {
-            amt = CalculatePercentageF(value, amount);
-        }
+        var amt = value.Get(amount, addType);
 
-        PlacementManager.instance.DecreaseConstructionCost(type, Mathf.RoundToInt(value - amt));
+        PlacementManager.instance.DecreaseConstructionCost(type, resourceType, Mathf.RoundToInt(value - amt));
         base.Upgrade();
     }
     public override string GetDescription()
     {
-        return $"Decrease construction cost of {type} by {amount} {upgradeType.ToStringOverride()} \n";
+        return $"Decrease construction cost of {type} by {addType.ToStringOverride()} {amount}  \n";
     }
 }
 public class IncreaseStartingTimer : BaseUpgrade
 {
     public int amount;
+    public AddType addType;
     public override void Upgrade()
     {
-        float amt = amount;
-        if (upgradeType == UpgradeType.PERC)
-        {
-            amt = CalculatePercentageInt(GameManager.instance.extraTimeBeforeDestruction, amount);
-        }
-        GameManager.instance.AddStartingTimer(Mathf.RoundToInt(amt));
+        var amt = GameManager.instance.GetResource(ResourceType.Extra_Start_Timer).Get(amount, addType);
+        GameManager.instance.AddResource(ResourceType.Extra_Start_Timer, amt);
         base.Upgrade();
     }
     public override string GetDescription()
     {
-        return $"Increase starting timer by {amount} {upgradeType.ToStringOverride()} \n";
+        return $"Increase starting timer by {addType.ToStringOverride()} {amount}  \n";
     }
 }
 public class IncreaseRoundTimer : BaseUpgrade
 {
     public BuildingType type;
     public int amount;
+
+    public AddType addType;
     public override void Upgrade()
     {
         PlacementManager.instance.AddUpgradeToPlacementPrefab(type, this);
@@ -118,7 +101,7 @@ public class IncreaseRoundTimer : BaseUpgrade
     }
     public override string GetDescription()
     {
-        return $"Increase round timer by {amount} {upgradeType.ToStringOverride() } when building {type} is finished \n";
+        return $"Increase round timer by {addType.ToStringOverride()} {amount}   when building {type} is finished \n";
     }
 }
 public class AddConstructionNear : BaseUpgrade {
@@ -150,28 +133,30 @@ public class AddConstructionNear : BaseUpgrade {
     }
 }
 public class UpgradeBaseRewardTime : BaseUpgrade {
+    public AddType addType;
     public int amount;
     public override void Upgrade()
     {
-        GameManager.instance.AddBaseRewardTime(amount);
+        GameManager.instance.AddResource(ResourceType.Base_Trio_Time, amount);
         base.Upgrade();
     }
     public override string GetDescription()
     {
-        return $"Upgrade Base reward time by {amount} {upgradeType.ToStringOverride()} when 1 house, 1 farm and 1 industries are put together \n";
+        return $"Upgrade Base reward time by {addType.ToStringOverride()} {amount}  when 1 house, 1 farm and 1 industries are put together \n";
     }
 }
 public class UpgradeBaseRewardGold : BaseUpgrade
 {
     public int amount;
+    public AddType addType;
     public override void Upgrade()
     {
-        GameManager.instance.AddBaseRewardGold(amount);
+        GameManager.instance.AddResource(ResourceType.Base_Trio_Gold, amount);
         base.Upgrade();
     }
     public override string GetDescription()
     {
-        return $"Upgrade Base reward gold by {amount} {upgradeType.ToStringOverride()} when 1 house, 1 farm and 1 industries are put together \n";
+        return $"Upgrade Base reward gold by {addType.ToStringOverride()} {amount}  when 1 house, 1 farm and 1 industries are put together \n";
     }
 }
 public class AddPlacementPrefab : BaseUpgrade {
@@ -235,7 +220,6 @@ public class AddCheckFourChance : BaseUpgrade
 
     public override void Upgrade()
     {
-        //PlacementManager.instance.AddPlacementPrefab(type, prefab);
         PlacementManager.instance.AddUpgradeToPlacementPrefab(type, this);
         base.Upgrade();
     }
@@ -247,7 +231,7 @@ public class AddCheckFourChance : BaseUpgrade
 
             if(building.HasFourInLine())
             {
-                GameManager.instance.AddPoints(BuildingType.Gold, goldEarn);
+                GameManager.instance.AddResource(ResourceType.Gold, goldEarn);
             }
             base.Apply(building);
         }

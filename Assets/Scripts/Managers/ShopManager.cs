@@ -31,14 +31,14 @@ public class ShopManager : MonoBehaviour
     }
     void UpdateTextUI()
     {
-        int gold = GameManager.instance.TryGetRoundPoints(BuildingType.Gold);
+        int gold = GameManager.instance.TryGetRoundResource(ResourceType.Gold);
         goldText.text = gold.ToString();
     }
 }
 [Serializable]
 public class ShopItem {
     Action OnBuy;
-    public BuildingType type;
+    public ResourceType type;
     public int cost;
     public TextMeshProUGUI costText;
     public Button button;
@@ -48,11 +48,11 @@ public class ShopItem {
         costText.text = $"$ {cost}";
     }
     public void Buy() {
-        if (GameManager.instance.TryGetRoundPoints(BuildingType.Gold) >= 0)
+        if (GameManager.instance.HasRoundResource(ResourceType.Gold, cost))
         {
-            GameManager.instance.ConsumeRoundPoints(BuildingType.Gold, cost);
+            GameManager.instance.ConsumeRoundResource(ResourceType.Gold, cost);
+            GameManager.instance.AddResource(type, 1);
             OnBuy?.Invoke();
-            GameManager.instance.AddPoints(type, 1);
         }
         else {
             Debug.Log("you dont have enough money");

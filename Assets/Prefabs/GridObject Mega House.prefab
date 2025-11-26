@@ -138,9 +138,9 @@ MonoBehaviour:
   mega: {fileID: 0}
   basedRewards:
     _serializedList:
-    - Key: 0
+    - Key: 1
       Value: 4
-    - Key: 4
+    - Key: 2
       Value: 10
   placementRequirements: []
   references:

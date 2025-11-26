@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -5,19 +6,23 @@ public class AddPointsListener : MonoBehaviour
 {
     public UnityEvent action;
 
-    public BuildingType targetPoints;
+    public ResourceType resourceType;
+    private void OnValidate()
+    {
+        Debug.Log("AddPointsListener in " + gameObject.name);
+    }
     private void OnEnable()
     {
-        EventBus.Subscribe<PointsAddedEvent>(OnAddedPoints);
+        EventBus.Subscribe<ResourceChangedEvent>(OnResourceChanged);
     }
     private void OnDisable()
     {
-        EventBus.UnSubscribe<PointsAddedEvent>(OnAddedPoints);
+        EventBus.UnSubscribe<ResourceChangedEvent>(OnResourceChanged);
     }
 
-    private void OnAddedPoints(PointsAddedEvent e)
+    private void OnResourceChanged(ResourceChangedEvent e)
     {
-        if(targetPoints == e.type)
-        action?.Invoke();
+        if (resourceType == e.type)
+            action?.Invoke();
     }
 }

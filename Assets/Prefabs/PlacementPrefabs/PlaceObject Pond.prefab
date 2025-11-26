@@ -446,14 +446,19 @@ MonoBehaviour:
   button: {fileID: 2467173042210711178}
   costText: {fileID: 7216041184846912339}
   item:
+    cost:
+      _serializedList:
+      - Key: 3
+        Value: 10
     prefab: {fileID: -6800061734087120901, guid: a3171d741905f6f47a0531e0ee990a7f, type: 3}
     cooldown: 0
     onCooldown: 0
     constructionTime: 10
-    goldCost: 40
     upgrades: []
     description: 
+    extraDescription: Buildings near pond gives +1 of buildingType
     type: 5
+    isFree: 0
   references:
     version: 2
     RefIds: []

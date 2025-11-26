@@ -51,7 +51,113 @@ public static class Vector3Extension {
 }
 public static class IntExtension
 {
-   
+    public static int Get(this int value, int amount, AddType type) {
+      
+        if (type == AddType.PERC)
+        {
+            return Mathf.RoundToInt(value * (float)(amount / 100f));
+        }
+        else
+        {
+            return amount;
+        }
+    }
+    public static int Get(this int value, float amount, AddType type)
+    {
+        if (type == AddType.PERC)
+        {
+            return Mathf.RoundToInt(value * amount / 100f);
+        }
+        else
+        {
+            return Mathf.RoundToInt(amount);
+        }
+    }
+    public static int Add(this int value, int amount, AddType type) {
+        if (type == AddType.SUM)
+        {
+            return value + amount;
+        }
+        else if (type == AddType.PERC)
+        {
+            return Mathf.RoundToInt(value + (float)(amount / 100f));
+        }
+        else {
+            return value * amount;
+        }
+    }
+    public static int Add(this int value, float amount, AddType type) {
+        if (type == AddType.SUM)
+        {
+            return value + Mathf.RoundToInt(amount);
+        }
+        else if (type == AddType.PERC)
+        {
+            return Mathf.RoundToInt(value + amount / 100f);
+        }
+        else
+        {
+            return Mathf.RoundToInt(value * amount);
+        }
+    }
+}
+public static class FloatExtension {
+    public static float Add(this float value, int amount, AddType type)
+    {
+        return value.Add((float)amount, type);
+    }
+    public static float Add(this float value, float amount, AddType type)
+    {
+        if (type == AddType.SUM)
+        {
+            return value + amount;
+        }
+        else if (type == AddType.PERC)
+        {
+            return value + amount / 100f;
+        }
+        else
+        {
+            return value * amount;
+        }
+    }
+    public static float Get(this float value, int amount, AddType type)
+    {
+        return value.Get((float)amount, type);
+    }
+    public static float Get(this float value, float amount, AddType type)
+    {
+        if (type == AddType.PERC)
+        {
+            return value * amount / 100f;
+        }
+        else
+        {
+            return amount;
+        }
+    }
+}
+public enum AddType{ 
+    SUM,
+    PERC,
+    MULT
+}
+public static class AddTypeExtension
+{
+    public static string ToStringOverride(this AddType type)
+    {
+        if (type == AddType.SUM)
+        {
+            return "+";
+        }
+        else if (type == AddType.PERC)
+        {
+            return "%";
+        }
+        else {
+            return "X";
+        }
+    }
 }
 public static class MathHelper
 {

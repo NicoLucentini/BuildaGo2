@@ -448,15 +448,16 @@ MonoBehaviour:
   item:
     cost:
       _serializedList:
-      - Key: 4
+      - Key: 3
         Value: 4
     prefab: {fileID: -6800061734087120901, guid: 80bb1384f4adcff42b3ffeaefffce3cb, type: 3}
     cooldown: 0
     onCooldown: 0
     constructionTime: 1
-    goldCost: 5
     upgrades: []
     description: 
+    extraDescription: Houses +1 gold per river \n Farms +1 moves per river \n Industries
+      -1 gold per river
     type: 8
     isFree: 0
   references:

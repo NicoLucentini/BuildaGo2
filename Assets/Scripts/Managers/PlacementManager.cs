@@ -43,15 +43,8 @@ public class PlacementManager : MonoBehaviour
     private void Start()
     {
         placementPrefabs.ToList().ForEach(x => {
-            x.Value.item.type = x.Key;
-            x.Value.button.onClick.AddListener(() => OnSelectPrefab(x.Value.item));
-            x.Value.button.gameObject.AddComponent<HoverDetector>().Set(
-                () => TooltipSystem.instance.ShowWithOffset(x.Value.item.GetDescription(), x.Value.button.GetComponent<RectTransform>(), new Vector3(25, 150, 0)),
-                () => TooltipSystem.instance.Hide());
-            x.Value.UpdateUI(x.Value.item);
+            x.Value.Init(x.Key, ()=>OnSelectPrefab(x.Value.item));
         }); ;
-
-
     }
 
     void OnEnable()
@@ -334,7 +327,7 @@ public class PlacementManager : MonoBehaviour
     {
         var pref = placementPrefabs[type];
 
-        GameManager.instance.timer--;
+        GameManager.instance.ConsumeResource(ResourceType.Timer, 1);
         PlaceBuilding(pref.item.prefab, point, pref.item.constructionTime, true, pref.item.upgrades);
     }
     public void PlaceBuilding(Building prefab, Vector3 point, float constructionTime = 0, bool startConstruction = true, List<BaseUpgrade> upgrades = null) {
@@ -375,9 +368,9 @@ public class PlacementManager : MonoBehaviour
     {
         placementPrefabs[type].item.constructionTime = newAmount;
     }
-    public void DecreaseConstructionCost(BuildingType type, int newAmount)
+    public void DecreaseConstructionCost(BuildingType type, ResourceType resource, int newAmount)
     {
-        placementPrefabs[type].item.SetGold(newAmount);
+        placementPrefabs[type].item.SetCost(resource, newAmount);
     }
     public float GetConstructionTime(BuildingType type)
     {
@@ -385,11 +378,12 @@ public class PlacementManager : MonoBehaviour
 
         return placementPrefabs[type].item.constructionTime;
     }
-    public float GetConstructionCost(BuildingType type)
+    public float GetConstructionCost(BuildingType type, ResourceType resourceType)
     {
         if (!placementPrefabs.ContainsKey(type)) return 0;
+        if (!placementPrefabs[type].item.cost.ContainsKey(resourceType)) return 0;
 
-        return placementPrefabs[type].item.goldCost;
+        return placementPrefabs[type].item.cost[resourceType];
     }
     public void AddUpgradeToPlacementPrefab(BuildingType type, BaseUpgrade upgrade)
     {
@@ -398,13 +392,7 @@ public class PlacementManager : MonoBehaviour
     }
     public void AddPlacementPrefab(BuildingType type, GameObject prefab) {
         var go = Instantiate(prefab, placementPrefabsTransform).GetComponent<UIPlacementPrefab>();
-
-        go.item.type = type;
-        go.button.onClick.AddListener(() => OnSelectPrefab(go.item));
-        go.button.gameObject.AddComponent<HoverDetector>().Set(
-            () => TooltipSystem.instance.ShowWithOffset(go.item.GetDescription(), go.button.GetComponent<RectTransform>(), new Vector3(25, 150, 0)),
-            () => TooltipSystem.instance.Hide());
-        go.UpdateUI(go.item);
+        go.Init(type, () => OnSelectPrefab(go.item));
         placementPrefabs.TryAdd(type, go);
     }
     private void OnDrawGizmos()
@@ -431,12 +419,11 @@ public enum BuildingType {
 
 [Serializable]
 public class PlacementPrefabs  {
-    public SerializedDictionary<BuildingType, int> cost = new SerializedDictionary<BuildingType, int>();
+    public SerializedDictionary<ResourceType, int> cost = new SerializedDictionary<ResourceType, int>();
     public Building prefab;
     public float cooldown;
     public bool onCooldown = false;
     public float constructionTime;
-    public int goldCost;
     [SerializeReference] public List<BaseUpgrade> upgrades = new();
     public string description;
     [TextArea(1,5)]public string extraDescription;
@@ -444,6 +431,7 @@ public class PlacementPrefabs  {
     public bool isFree = false;
 
     public Action<PlacementPrefabs> OnChanged;
+
     public string GetDescription() {
         if (description == "")
         {
@@ -457,10 +445,7 @@ public class PlacementPrefabs  {
     public void OnCooldown(bool on) {
         onCooldown = on;
     }
-    public void SetGold(int goldAmount) {
-        this.goldCost = goldAmount;
-        OnChanged?.Invoke(this);
-    }
+   
     public string GetCostToString() {
         string val = "";
 
@@ -469,7 +454,13 @@ public class PlacementPrefabs  {
         }
         val = val.Trim();
         return val;
-
+    }
+    public void SetCost(ResourceType type, int newValue) { 
+        if(cost.ContainsKey(type))
+        {
+            cost[type] = newValue;
+            OnChanged?.Invoke(this);
+        }
     }
     public void AddUpgrade(BaseUpgrade upgrade)
     {
@@ -477,19 +468,15 @@ public class PlacementPrefabs  {
     }
     public bool HasEnough() {
         if (isFree) return true;
-        foreach (var k in cost.Keys) {
-            if (GameManager.instance.GetPoints(k) < cost[k]) {
-                return false;
-            }
-        }
-        return true;
+
+        return cost.Keys.All(x => GameManager.instance.HasResource(x, cost[x]));
     }
     public void ConsumePoints() {
         if (isFree) return;
 
         foreach (var k in cost.Keys)
         {
-            GameManager.instance.UsePoints(k, cost[k]);
+            GameManager.instance.ConsumeResource(k, cost[k]);
         }
     }
 }

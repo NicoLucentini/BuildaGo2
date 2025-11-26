@@ -118,9 +118,10 @@ public class TalentItem // Podria ser scriptable object
     public int upgradeAmount = 0;
     public int upgradesDone = 0;
     public TalentStatus status;
-    public SerializedDictionary<BuildingType, int> cost;
+    public SerializedDictionary<ResourceType, int> cost;
+    public float costIncreasePerUpgrade = 2f;
+
     [SerializeReference] public List<BaseUpgrade> upgrades = new List<BaseUpgrade>();    
-    //[NonSerialized] public List<TalentItem> from = new(); // 
     [NonSerialized] public List<TalentItem> to = new();
 
     public string DoDescription() {
@@ -152,7 +153,7 @@ public class TalentItem // Podria ser scriptable object
         if (status == TalentStatus.USED) { TalentManager.instance.ShowPopup("Talent already used"); return; }
         if (!HasEnough()) { TalentManager.instance.ShowPopup("You dont have enough resources"); return; }
 
-        cost.ToList().ForEach(x => GameManager.instance.UsePoints(x.Key, x.Value));
+        cost.ToList().ForEach(x => GameManager.instance.ConsumeResource(x.Key, x.Value));
 
 
         upgrades.ForEach(x=>x.Upgrade());
@@ -162,9 +163,16 @@ public class TalentItem // Podria ser scriptable object
         }
         to.ForEach(x => x.Unlock());
         OnTalentModified?.Invoke();
-    } 
+    }
+    void UpdateCosts() {
+        cost.ToList().ForEach(x =>
+        {
+            cost[x.Key] = Mathf.RoundToInt(cost[x.Key] * costIncreasePerUpgrade);
+        });
+        OnTalentModified?.Invoke();
+    }
     bool HasEnough() {
-        return TalentManager.instance.cheat ||  cost.All(x => GameManager.instance.HasPoints(x.Key, x.Value));
+        return TalentManager.instance.cheat ||  cost.All(x => GameManager.instance.HasResource(x.Key, x.Value));
     }
     void ChangeStatus(TalentStatus newStatus) {
         status = newStatus;

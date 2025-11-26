@@ -25,7 +25,6 @@ public class MakeTransparent :MonoBehaviour{
     }
     public void MakeTransparents()
     {
-        Debug.Log("Make Transparents");
         foreach (var k in originalMaterials)
         {
             if(!transparentMaterials.ContainsKey(k.Key))

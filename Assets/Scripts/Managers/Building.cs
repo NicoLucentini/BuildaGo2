@@ -33,7 +33,7 @@ public class Building : MonoBehaviour {
 
     public Building mega;
 
-    public SerializedDictionary<BuildingType, int> basedRewards = new();
+    public SerializedDictionary<ResourceType, int> basedRewards = new();
 
     [SerializeReference]
     public List<IPlacementRequirement> placementRequirements = new();
@@ -144,8 +144,8 @@ public class Building : MonoBehaviour {
         int sumPoints = count[type];
         //Money reward in runtime
         int sumMoney = 0;
-        int timeValue = GameManager.instance.baseRewardTime;
-        int goldValue = GameManager.instance.baseRewardGold;
+        int timeValue = GameManager.instance.GetResource(ResourceType.Base_Trio_Time);
+        int goldValue = GameManager.instance.GetResource(ResourceType.Base_Trio_Gold);
         int riverReward = 0;
 
 
@@ -192,12 +192,13 @@ public class Building : MonoBehaviour {
         //this could be the building finished...
         //this is like the standar reward
         foreach (var baser in basedRewards) { 
-            GameManager.instance.AddReward(baser.Key, baser.Value);
+            GameManager.instance.AddResourceReward(baser.Key, baser.Value);
 
             UIRewardManager.instance.CreateBuildingReward(transform.position.WithOffset(0.75f, 0.25f, 0), 
                 GetComponent<MeshRenderer>().material.color, 
                 baser.Value.ToString());
-            if (baser.Key == BuildingType.Gold) {
+
+            if (baser.Key == ResourceType.Gold) {
                 UIRewardManager.instance.CreateGoldReward(transform.position.WithOffset(-0.75f, 0.25f, 0), Color.white, baser.Value.ToString());
             }
         }

@@ -25,4 +25,13 @@ public class UIPlacementPrefab : MonoBehaviour{
         costText.text = item.GetCostToString();
         button.GetComponentInChildren<TextMeshProUGUI>().text = pref.type.ToString();
     }
+    public void Init(BuildingType type, Action OnButtonClick)
+    {
+        item.type = type;
+        button.onClick.AddListener(() => OnButtonClick?.Invoke());
+        button.gameObject.AddComponent<HoverDetector>().Set(
+            () => TooltipSystem.instance.ShowWithOffset(item.GetDescription(), button.GetComponent<RectTransform>(), new Vector3(25, 150, 0)),
+            () => TooltipSystem.instance.Hide());
+        UpdateUI(item);
+    }
 }

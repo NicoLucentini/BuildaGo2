@@ -5,18 +5,17 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
+public enum GameStatus
+{
+    PLAYING,
+    BOSS_END,
+    TUTORIAL_END,
+    TALENTS,
+    RESOURCES_EARNED,
+    WON
+}
 public class GameManager : MonoBehaviour, ISaver
 {
-
-    enum GameStatus
-    {
-        PLAYING,
-        BOSS_END,
-        TUTORIAL_END,
-        TALENTS,
-        RESOURCES_EARNED
-    }
     public static Action OnStartGame;
     public static Action OnGameEnd;
 
@@ -25,36 +24,24 @@ public class GameManager : MonoBehaviour, ISaver
 
     public LevelConfigurationSO levelConfiguration;
     public int currentLevel = 0;
-    public List<LevelConfigurationSO> levels; 
+    public List<LevelConfigurationSO> levels;
 
     private GameStatus status;
 
-    [SerializeField]public int extraTimeBeforeDestruction = 0;
-    [SerializeField]public int extraStartingGold = 0;
-    [SerializeField]public int timer;
+    //[SerializeField] public int extraTimeBeforeDestruction = 0;
+    //[SerializeField] public int extraStartingGold = 0;
 
-    public SerializedDictionary<BuildingType, int> points;
-    public SerializedDictionary<BuildingType, int> roundPoints;
-   
-    public List<Building> buildings=new List<Building>();
-    public SerializedDictionary<BuildingType, int> countBuildings = new ();
-    public int baseRewardTime = 0;
-    public int baseRewardGold = 0;
 
-    [Header("UI")]
-    public TextMeshProUGUI timerText;
-    public Button startButton;
-    public Button closeTalentButton;
-    public Button finishTurn;
-    public GameObject startCanvas;
-    public GameObject gameCanvas;
-    public GameObject resourcesCanvas;
-    public UIFinishGameCanvas finishGameCanvas;
-    public GameObject talentCanvas;
-    public GameObject bossEnd;
+    public SerializedDictionary<ResourceType, int> resources = new();
+    public SerializedDictionary<ResourceType, int> roundResources = new();
+
+    public List<Building> buildings = new List<Building>();
+    public SerializedDictionary<BuildingType, int> countBuildings = new();
+    //public int baseRewardTime = 0;
+    //public int baseRewardGold = 0;
+
     private Coroutine gameTimerCoroutine;
 
-    public SerializedDictionary<BuildingType, TextMeshProUGUI> pointTexts; // sacar el oro de aca poque no es un BuildingType
 
     private void Awake()
     {
@@ -74,7 +61,11 @@ public class GameManager : MonoBehaviour, ISaver
     {
         PlacementManager.OnBuildingPlaced += AddBuilding;
         PlacementManager.OnConstructionFinished += CheckForBossEnd;
+        EventBus.Subscribe<ClickStartGameEvent>(OnClickedStartGame);
+        EventBus.Subscribe<ClickFinishTurnEvent>(OnClickedFinishTurn);
+
         EventBus.Subscribe<TutorialEndedEvent>(OnTutorialEnded);
+
         EventBus.Subscribe<BuildingFinishedEvent>(OnBuildingFinishedEvent);
         EventBus.Subscribe<BuildingTrioEvent>(OnBuildingTrioEvent);
         EventBus.Subscribe<BuildingSameTypeEvent>(OnBuildingSameType);
@@ -84,76 +75,95 @@ public class GameManager : MonoBehaviour, ISaver
     {
         PlacementManager.OnBuildingPlaced -= AddBuilding;
         PlacementManager.OnConstructionFinished -= CheckForBossEnd;
+        EventBus.UnSubscribe<ClickStartGameEvent>(OnClickedStartGame);
+        EventBus.UnSubscribe<ClickFinishTurnEvent>(OnClickedFinishTurn);
+
         EventBus.UnSubscribe<TutorialEndedEvent>(OnTutorialEnded);
+
         EventBus.UnSubscribe<BuildingFinishedEvent>(OnBuildingFinishedEvent);
         EventBus.UnSubscribe<BuildingTrioEvent>(OnBuildingTrioEvent);
         EventBus.UnSubscribe<BuildingSameTypeEvent>(OnBuildingSameType);
         EventBus.UnSubscribe<BuildingNearRiverEvent>(OnBuildingNearRiver);
     }
+    private void Start()
+    {
+        SetResource(ResourceType.Houses, 0);
+        SetResource(ResourceType.Farms, 0);
+        SetResource(ResourceType.Industries, 0);
+        SetResource(ResourceType.Gold, 0);
+        SetResource(ResourceType.Timer, 0);
 
-    private void OnBuildingNearRiver(BuildingNearRiverEvent e)
+        roundResources = new SerializedDictionary<ResourceType, int> {
+            { ResourceType.Houses, 0 },
+            { ResourceType.Farms, 0 },
+            { ResourceType.Industries, 0 },
+            { ResourceType.Gold, 0 }
+        };
+        if (currentLevel == 0)// it means there is a tutorial
+        {
+            EventBus.Publish(new TutorialStartEvent());
+        }
+        else
+        {
+            SetLevel();
+        }
+    }
+    private void OnClickedFinishTurn(ClickFinishTurnEvent @event)
+    {
+        EndGame(true, false);
+    }
+
+    private void OnClickedStartGame(ClickStartGameEvent @event)
+    {
+        StartGame();
+    }
+
+
+
+    void OnBuildingNearRiver(BuildingNearRiverEvent e)
     {
         switch (e.building.type) {
-            case BuildingType.Houses: AddReward(BuildingType.Gold, e.amount); break;
+            case BuildingType.Houses: AddResourceReward(ResourceType.Gold, e.amount); break;
             case BuildingType.Farms: AddTimer(e.amount); break;
-            case BuildingType.Industries: UseGold(e.amount); break;
+            case BuildingType.Industries: ConsumeResource(ResourceType.Gold, e.amount); break;
             default: break;
         }
     }
 
     void OnBuildingSameType(BuildingSameTypeEvent e)
     {
-        AddReward(e.building.type, e.amount);
+        if (e.building.type == BuildingType.Houses) {
+            AddResourceReward(ResourceType.Houses, e.amount);
+        }
+        else if (e.building.type == BuildingType.Farms) {
+            AddResourceReward(ResourceType.Farms, e.amount);
+        }
+        else if (e.building.type == BuildingType.Industries) {
+            AddResourceReward(ResourceType.Industries, e.amount);
+        }
     }
 
     void OnBuildingTrioEvent(BuildingTrioEvent e)
     {
-        AddReward(BuildingType.Gold, e.goldReward);
+        AddResourceReward(ResourceType.Gold, e.goldReward);
         AddTimer(e.timeReward);
     }
     void OnBuildingFinishedEvent(BuildingFinishedEvent e) {
         switch (e.building.type)
         {
-            case BuildingType.Houses: AddReward(BuildingType.Houses, 1); break;
-            case BuildingType.Farms: { AddReward(BuildingType.Farms, 1); ; AddTimer(1); break; }
-            case BuildingType.Industries: { AddReward(BuildingType.Gold, 1); AddReward(BuildingType.Industries, 1); } break;
+            case BuildingType.Houses: AddResourceReward(ResourceType.Houses, 1); break;
+            case BuildingType.Farms: { AddResourceReward(ResourceType.Farms, 1); ; AddTimer(1); break; }
+            case BuildingType.Industries: { AddResourceReward(ResourceType.Gold, 1); AddResourceReward(ResourceType.Industries, 1); } break;
             default: break;
         }
 
-        if(timer <= 0) { 
+        if (GetResource(ResourceType.Timer) <= 0) {
             EndGame();
         }
     }
-    private void Start()
-    {
-        startButton.onClick.AddListener(StartGame);
-        closeTalentButton.onClick.AddListener(CloseTalents);
-        finishTurn.onClick.AddListener(() => EndGame(true, false));
-        points = new SerializedDictionary<BuildingType, int>();
 
-        points.Add(BuildingType.Houses, 0);
-        points.Add(BuildingType.Farms, 0);
-        points.Add(BuildingType.Industries, 0);
-        points.Add(BuildingType.Gold, 0);
 
-        roundPoints = new SerializedDictionary<BuildingType, int>
-        {
-            { BuildingType.Houses, 0 },
-            { BuildingType.Farms, 0 },
-            { BuildingType.Industries, 0 },
-            { BuildingType.Gold, 0 }
-        };
-
-        if (currentLevel == 0)// it means there is a tutorial
-        {
-            EventBus.Publish(new TutorialStartEvent());
-        }
-        else {
-            SetLevel();
-        } 
-    }
-
-    private void CheckForBossEnd(Building building)
+    void CheckForBossEnd(Building building)
     {
         if (building.type != BuildingType.Boss) return;
 
@@ -164,14 +174,14 @@ public class GameManager : MonoBehaviour, ISaver
     void OnTutorialEnded(TutorialEndedEvent e) {
         EndGame(false, true);
     }
-    
-    void AddBuilding(Building building) { 
+
+    void AddBuilding(Building building) {
         buildings.Add(building);
         countBuildings.TryAdd(building.type, 1);
     }
     public void RemoveBuilding(Building building)
     {
-        if (buildings.Contains(building)){ 
+        if (buildings.Contains(building)) {
             buildings.Remove(building);
         }
         if (countBuildings.ContainsKey(building.type)) {
@@ -179,7 +189,7 @@ public class GameManager : MonoBehaviour, ISaver
         }
     }
     private bool SetLevel() {
-        if (currentLevel < levels.Count) { 
+        if (currentLevel < levels.Count) {
             levelConfiguration = levels[currentLevel];
             return true;
         }
@@ -189,37 +199,24 @@ public class GameManager : MonoBehaviour, ISaver
         currentLevel++;
 
         if (!SetLevel()) {
-            bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"You won!!";
+            ChangeStatus(GameStatus.WON);
         }
     }
     private void StartGame()
     {
-        int gameTime = extraTimeBeforeDestruction + levelConfiguration.timeBeforeDestruction;
-        int startGold = extraStartingGold + levelConfiguration.startingGold;
+        int gameTime = GetResource(ResourceType.Extra_Start_Timer) + levelConfiguration.timeBeforeDestruction;
+        int startGold = GetResource(ResourceType.Extra_Start_Gold) + levelConfiguration.startingGold;
 
-        roundPoints[BuildingType.Houses] = 0;
-        roundPoints[BuildingType.Farms] = 0;
-        roundPoints[BuildingType.Industries] = 0;
-        roundPoints[BuildingType.Gold] = 0;
+        roundResources[ResourceType.Houses] = 0;
+        roundResources[ResourceType.Farms] = 0;
+        roundResources[ResourceType.Industries] = 0;
+        roundResources[ResourceType.Gold] = 0;
 
-        points[BuildingType.Gold] = startGold;
-        /*
-        roundPoints = new SerializedDictionary<BuildingType, int>
-        {
-            { BuildingType.Housing, 0 },
-            { BuildingType.Farm, 0 },
-            { BuildingType.Industries, 0 },
-            { BuildingType.Gold, 0 }
-        };
+        SetResource(ResourceType.Gold, startGold);
+        SetResource(ResourceType.Timer, gameTime);
 
-        points[BuildingType.Gold] = startGold;
-        */
         buildings.DestroyAndClearList();
         countBuildings.Clear();
-        startCanvas.SetActive(false);
-        gameCanvas.SetActive(true);
-
-        pointTexts.ToList().ForEach(x => UpdateUI(x.Key));
 
         gameTimerCoroutine = StartCoroutine(GameTimerCoroutine(gameTime));
 
@@ -227,145 +224,119 @@ public class GameManager : MonoBehaviour, ISaver
         OnStartGame?.Invoke();
     }
     IEnumerator GameTimerCoroutine(int duration) {
-        timer = duration;
-        while (timer > 0) {
+        //timer = duration;
+        while (GetResource(ResourceType.Timer) > 0) {
 
             //timer--;
-            timerText.text =  timer + " Movements Left";
+            //timerText.text = timer + " Movements Left";
             yield return null;
         }
     }
-   
+
     void EndGame(bool normalFinish = true, bool isTutorial = false) {
         if (status != GameStatus.PLAYING) return;
 
-        if (gameTimerCoroutine != null) 
+        if (gameTimerCoroutine != null)
             StopCoroutine(gameTimerCoroutine);
 
         OnGameEnd?.Invoke();
+        EventBus.Publish(new GameEndEvent(isTutorial ? 0 : currentLevel,  resources));
 
-        if (normalFinish)
-        {
-            GoToFinishGame();
-            Debug.Log("Lose Game");
+        if (normalFinish) {
+            ChangeStatus(GameStatus.RESOURCES_EARNED);
         }
         else {
-            //MostrarCosas de boss etceeteraaa
-            //This is level finished
-            bossEnd.gameObject.SetActive(true);
-            if (isTutorial)
-            {
-                bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"Congratulations!! \n Tutorial complete !!";
-                ChangeStatus(GameStatus.TUTORIAL_END);
-            }
-            else { 
-                bossEnd.GetComponentInChildren<TextMeshProUGUI>().text = $"Congratulations!!\nLevel {currentLevel} complete ";
-                ChangeStatus(GameStatus.BOSS_END);
-            }
+            ChangeStatus(isTutorial ? GameStatus.TUTORIAL_END : GameStatus.BOSS_END);
             ChangeLevel();
-            Invoke("GoToFinishGame", 3f);
+            Invoke("ChangeToFinishGame", 3f);
         }
-        
     }
-    void ChangeStatus(GameStatus gameStatus) { 
+    void ChangeStatus(GameStatus gameStatus) {
         status = gameStatus;
+        EventBus.Publish(new GameStatusEvent(status));
     }
-    void GoToFinishGame() {
-        bossEnd.gameObject.SetActive(false);
+    void ChangeToFinishGame() {
         ChangeStatus(GameStatus.RESOURCES_EARNED);
-        finishGameCanvas.gameObject.SetActive(true);
-        finishGameCanvas.Set(roundPoints);
-        gameCanvas.SetActive(false);
-    }
-    internal void GoToTalents()
-    {
-        ChangeStatus(GameStatus.TALENTS);
-        finishGameCanvas.gameObject.SetActive(false);
-        talentCanvas.gameObject.SetActive(true);
-    }
-    void CloseTalents() {
-        talentCanvas.SetActive(false);
-        startCanvas.SetActive(true);
-        bossEnd.gameObject.SetActive(false);
     }
 
     #region Data
 
-    public int GetBuildingCount(BuildingType type) { 
-        if(countBuildings.ContainsKey(type))
+    public int GetBuildingCount(BuildingType type) {
+        if (countBuildings.ContainsKey(type))
             return countBuildings[type];
 
         return 0;
     }
-    public bool HasPoints(BuildingType type, int amount)
-    {
-        return points[type] >= amount;
-    }
-    public void UsePoints(BuildingType type, int amount)
-    {
-        points[type] -= amount;
-        UpdateUI(type);
-    }
-    public int TryGetRoundPoints(BuildingType type) {
-        if (roundPoints == null) return 0;
 
-        if (roundPoints.ContainsKey(type)) { 
-            return roundPoints[type];
+    public void AddTimer(int amount) {
+        AddResource(ResourceType.Timer, amount);
+    }
+    public void AddResourceReward(ResourceType type, int amount) {
+        AddResource(type, amount);
+        if (roundResources.ContainsKey(type)) {
+            roundResources[type] += amount;
+        }
+    }
+    public void AddResource(ResourceType type, int amount) {
+        if (resources.ContainsKey(type)) {
+            resources[type] += amount;
+            EventBus.Publish(new ResourceChangedEvent(type, resources[type]));
+        }
+    }
+    public void SetResource(ResourceType type, int amount)
+    {
+        if (resources.ContainsKey(type))
+        {
+            resources[type] = amount;
+        }
+        else { 
+            resources.Add(type, amount);
+        }
+        EventBus.Publish(new ResourceChangedEvent(type, resources[type]));
+    }
+    public void ConsumeResource(ResourceType type, int amount)
+    {
+        if (resources.ContainsKey(type))
+        {
+            resources[type] -= amount;
+            EventBus.Publish(new ResourceChangedEvent(type, resources[type]));
+        }
+    }
+    public bool HasResource(ResourceType type, int amount)
+    {
+        if (resources.ContainsKey(type))
+        {
+            return resources[type] - amount >= 0;
+        }
+        return false;
+    }
+    public int GetResource(ResourceType type) {
+        if (resources.ContainsKey(type))
+        {
+            return resources[type];
         }
         return 0;
     }
-    public void ConsumeRoundPoints(BuildingType type,int amount)
-    {
-        if (roundPoints == null) return;
-
-        if (roundPoints.ContainsKey(type))
-        {
-            roundPoints[type] -= amount;
+    public int TryGetRoundResource(ResourceType type) {
+        if (roundResources.ContainsKey(type)) {
+            return roundResources[type];
         }
+        return 0;
     }
-
-    public bool HasGold(int amount)
+    public bool HasRoundResource(ResourceType type, int amount)
     {
-        return HasPoints(BuildingType.Gold, amount);
+        if (roundResources.ContainsKey(type))
+        {
+            return roundResources[type] - amount >= 0;
+        }
+        return false;
     }
-    public void UseGold(int amount)
+    public void ConsumeRoundResource(ResourceType type, int amount)
     {
-        UsePoints(BuildingType.Gold, amount);
-    }
-    private void UpdateUI(BuildingType type)
-    {
-        pointTexts[type].text = points[type].ToString();
-    }
-
-    public void AddReward(BuildingType type, int amount)
-    {
-        AddPoints(type, amount);
-        roundPoints[type] += amount;
-    }
-    public int GetPoints(BuildingType type)
-    {
-        return (int)points[type];
-    }
-    public void AddPoints(BuildingType type, int amount)
-    {
-        EventBus.Publish(new PointsAddedEvent(amount, type));
-        points[type] += amount;
-        UpdateUI(type);
-    }
-    public void AddTimer(int amount) {
-        timer += amount;
-    }
-    public void AddStartingGold(int amount) {
-        extraStartingGold += amount;
-    }
-    public void AddStartingTimer(int amount) {
-        extraTimeBeforeDestruction += amount;
-    }
-    public void AddBaseRewardTime(int amount) { 
-        baseRewardTime += amount;
-    }
-    public void AddBaseRewardGold(int amount) {
-        baseRewardGold += amount;
+        if (roundResources.ContainsKey(type))
+        {
+            roundResources[type] -= amount;
+        }
     }
 
     public void Save()
@@ -373,11 +344,7 @@ public class GameManager : MonoBehaviour, ISaver
         SaveableData data = new SaveableData()
         {
             level = currentLevel,
-            points = points,
-            extraStartingGold = extraStartingGold,
-            extraTime = extraTimeBeforeDestruction,
-            baseRewardGold = baseRewardGold,
-            baseRewardTime = baseRewardTime,
+            points = resources,
         };
         data.SaveData("GameManager", data);
 
@@ -389,20 +356,27 @@ public class GameManager : MonoBehaviour, ISaver
         data = data.LoadData("GameManager");
         //ver que hacer...
         currentLevel = data.level;
-        points = data.points;
-        extraStartingGold = data.extraStartingGold;
-        extraTimeBeforeDestruction = data.extraTime;
-        baseRewardGold = data.baseRewardGold;
-        baseRewardTime = data.baseRewardTime;
+        resources = data.points;
 
     }
     #endregion
+}
+public enum ResourceType {
+    Houses,
+    Farms,
+    Industries,
+    Gold,
+    Timer,
+    Extra_Start_Timer,
+    Extra_Start_Gold,
+    Base_Trio_Gold,
+    Base_Trio_Time
 }
 [Serializable]
 public class SaveableData : ISaveable<SaveableData>
 {
     public int level;
-    public SerializedDictionary<BuildingType, int> points;
+    public SerializedDictionary<ResourceType, int> points;
     public int extraTime;
     public int extraStartingGold;
     public int baseRewardTime;
